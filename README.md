@@ -1,2 +1,2 @@
-# MVTVSSR
- Multivariate time-varying spatial super resolution
+# C-SinGAN
+ A conditional SinGAN architecture
