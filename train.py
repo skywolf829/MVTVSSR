@@ -94,6 +94,7 @@ if __name__ == '__main__':
     start_time = time.time()
     print_to_log_and_console("Started training at " + str(now), 
     os.path.join(opt["save_folder"], opt["save_name"]), "log.txt")
+    opt["num_training_examples"] = len(os.listdir(os.path.join(input_folder,opt["data_folder"])))
 
     # Train each scale 1 by 1
     for i in range(opt["n"]-1):

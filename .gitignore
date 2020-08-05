@@ -127,5 +127,7 @@ dmypy.json
 # Other
 *.npy
 *.png
+*.gif
+
 /SavedModels
 /InputData

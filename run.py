@@ -15,18 +15,12 @@ save_folder = os.path.join(MVTVSSR_folder_path, "SavedModels")
 
 variables = ["cref", "prate","rain", "rain2", "sgs", "sgs2", "sps", "sps2", "srs", "srs2", "sus", "sus2", "svs", "svs2", "sws", "sws2", "uh"]
 arr = []
-for i in range(1, 202):
+for i in range(2, 471):
     path_to_sim_data = os.path.join(input_folder, "NetCDF", "CM1", "test", "cm1out_00%04d.nc" % (i))
     file2read = Dataset(path_to_sim_data,'r',format="NETCDF4")
     dataframe = file2read.variables[variables[0]][:] 
     for j in range(1, len(variables)):
         dataframe = np.concatenate([dataframe, file2read.variables[variables[j]][:]], axis=0) 
-    arr.append(dataframe.astype(np.float32))
-    print(dataframe.shape)
+    dataframe = np.array(dataframe)
+    np.save(os.path.join(input_folder, "CM1_2", "test", str(i-2)+".npy"), dataframe.astype(np.float32))
     file2read.close()
-
-
-arr = np.array(arr)
-print(arr.shape)
-for i in range(arr.shape[0]):
-    np.save(os.path.join(input_folder, "CM1", "test", str(i)+".npy"), arr[i].astype(np.float32))

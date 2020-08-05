@@ -17,6 +17,9 @@ from torch.optim.optimizer import Optimizer, required
 from torch.autograd import Variable
 from torch import Tensor
 from torch.nn import Parameter
+from piq import ssim, psnr
+from matplotlib.pyplot import cm
+from torch.utils.tensorboard import SummaryWriter
 
 MVTVSSR_folder_path = os.path.dirname(os.path.abspath(__file__))
 input_folder = os.path.join(MVTVSSR_folder_path, "InputData")
@@ -83,17 +86,17 @@ def init_scales(opt):
 
 def init_gen(scale, opt):
     num_kernels_exp = math.log(opt["base_num_kernels"]) / math.log(2)
-    num_kernels = int(math.pow(2, num_kernels_exp + ((opt["n"]-scale) / 1.25)))
+    num_kernels = int(math.pow(2, num_kernels_exp + ((scale-1) / 4)))
 
     generator = MVTVSSR_Generator(opt["scales"][scale], opt["num_blocks"], opt["num_channels"],
     num_kernels, opt["kernel_size"], opt["stride"], 
     opt["conv_layer_padding"], opt["network_input_padding"], opt["mode"])
     weights_init(generator)
-    return generator
+    return generator, num_kernels
 
 def init_discrim_s(scale, opt):
     num_kernels_exp = math.log(opt["base_num_kernels"]) / math.log(2)
-    num_kernels = int(math.pow(2, num_kernels_exp + ((opt["n"]-scale) / 1.25)))
+    num_kernels = int(math.pow(2, num_kernels_exp + ((scale-1) / 4)))
 
     discriminator = MVTVSSR_Spatial_Discriminator(opt["scales"][scale], opt["num_blocks"], opt["num_channels"],
     num_kernels, opt["kernel_size"], opt["stride"], 
@@ -103,7 +106,7 @@ def init_discrim_s(scale, opt):
 
 def init_discrim_t(scale, opt):
     num_kernels_exp = math.log(opt["base_num_kernels"]) / math.log(2)
-    num_kernels = int(math.pow(2, num_kernels_exp + ((opt["n"]-scale) / 1.25)))
+    num_kernels = int(math.pow(2, num_kernels_exp + ((scale-1) / 4)))
 
     discriminator = MVTVSSR_Temporal_Discriminator(opt["scales"][scale], opt["num_blocks"], opt["num_channels"],
     num_kernels, opt["kernel_size"], opt["stride"], 
@@ -174,7 +177,7 @@ def load_models(opt, device):
                         gen_params_compat[k[7:]] = v
                     else:
                         gen_params_compat[k] = v
-                generator = init_gen(i+1, opt)
+                generator, num_kernels = init_gen(i+1, opt)
                 generator.load_state_dict(gen_params_compat)
                 generators.append(generator)
         print_to_log_and_console("Successfully loaded MVTVSSRGAN.generators", os.path.join(opt["save_folder"], opt["save_name"]), "log.txt")
@@ -217,7 +220,7 @@ def load_models(opt, device):
     else:
         print_to_log_and_console("Warning: %s doesn't exists - can't load these model parameters" % "MVTVSSRGAN.t_discriminators", 
         os.path.join(opt["save_folder"], opt["save_name"]), "log.txt")
-    
+
     return  generators, discriminators_s, discriminators_t
 
 def save_training_graph(losses, scale_num, opt):
@@ -255,6 +258,7 @@ def save_training_graph(losses, scale_num, opt):
 
     plt.savefig(os.path.join(opt["save_folder"], opt["save_name"], "errs_"+str(scale_num)+".png"))
     plt.close()
+    return fig, ax
 
 def train_single_scale(process_num, generators, discriminators_s, discriminators_t, opt):
     # Distributed - torch will call this with a different process_num (0, ... N-1)
@@ -272,51 +276,13 @@ def train_single_scale(process_num, generators, discriminators_s, discriminators
         gpu_id = opt["device"][process_num]
         torch.cuda.set_device(gpu_id)
         
-    losses = [[],[],[],[]]
-    torch.manual_seed(0)
-    
-    print_to_log_and_console("Process num %i training on GPU %i" % (process_num, gpu_id), 
-    os.path.join(opt["save_folder"], opt["save_name"]), "log.txt")
-
-    # Move all models to this GPU and make them distributed
-    for i in range(len(generators)):
-        generators[i].cuda(gpu_id)
-        generators[i].eval()
-        for param in generators[i].parameters():
-            param.requires_grad = False
-    
-    # Create the new generator and discriminator for this level
-    generator = init_gen(len(generators)+1, opt).cuda(gpu_id)    
-    discriminator_s = init_discrim_s(len(generators)+1, opt).cuda(gpu_id)
-    discriminator_t = init_discrim_t(len(generators)+1, opt).cuda(gpu_id)
-
-    if(opt["train_distributed"]):
-        generator = nn.parallel.DistributedDataParallel(generator, device_ids=[gpu_id], find_unused_parameters=True)
-        discriminator_s = nn.parallel.DistributedDataParallel(discriminator_s, device_ids=[gpu_id], find_unused_parameters=True)
-        discriminator_t = nn.parallel.DistributedDataParallel(discriminator_t, device_ids=[gpu_id], find_unused_parameters=True)
-
-    num_kernels_exp = math.log(opt["base_num_kernels"]) / math.log(2)
-    num_kernels_this_scale = int(math.pow(2, num_kernels_exp + ((opt["n"]-len(generators)) / 2.0)))
-    if(process_num == 0):
-        print_to_log_and_console("Kernels this scale: %i" % num_kernels_this_scale, 
-            os.path.join(opt["save_folder"], opt["save_name"]), "log.txt")
-    num_kernels_factor = num_kernels_this_scale / opt["base_num_kernels"]
+    # Initialize the dataset
+    dataset = Dataset(os.path.join(input_folder, opt["data_folder"]), opt)
 
     # Adjust minibatch based on scale size and number of kernels at this scale
-    minibatch_this_scale = int((opt["minibatch"] * (opt["scales"][-1][0] / opt["scales"][len(generators)][0]) * (opt["scales"][-1][1]  / opt["scales"][len(generators)][1])) / num_kernels_factor)
-    '''
-    if(process_num == 0):
-        print_to_log_and_console(generator, 
-            os.path.join(opt["save_folder"], opt["save_name"]), "log.txt")
-        print_to_log_and_console(discriminator_s, 
-            os.path.join(opt["save_folder"], opt["save_name"]), "log.txt")
-        print_to_log_and_console(discriminator_t, 
-            os.path.join(opt["save_folder"], opt["save_name"]), "log.txt")
-        print_to_log_and_console("Minibatch size this scale: %i" % (minibatch_this_scale), 
-            os.path.join(opt["save_folder"], opt["save_name"]), "log.txt")
-    '''
-    # Initialize the dataset
-    dataset = Dataset(os.path.join(input_folder, opt["data_folder"]), opt["num_training_examples"])
+    #minibatch_this_scale = int((opt["minibatch"] * (opt["scales"][-1][0] / opt["scales"][len(generators)][0]) * (opt["scales"][-1][1]  / opt["scales"][len(generators)][1])) / num_kernels_factor)
+    minibatch_this_scale = opt["minibatch"]
+    total_minibatches = opt["num_training_examples"] / (len(opt["device"]) * minibatch_this_scale)
 
     if(opt["train_distributed"]):
         train_sampler = torch.utils.data.distributed.DistributedSampler(
@@ -339,16 +305,61 @@ def train_single_scale(process_num, generators, discriminators_s, discriminators
             num_workers=opt["num_workers"]
         )
 
-    total_minibatches = opt["num_training_examples"] / (len(opt["device"]) * minibatch_this_scale)
+    losses = [[],[],[],[]]
+    torch.manual_seed(0)
+    
+    print_to_log_and_console("Process num %i training on GPU %i" % (process_num, gpu_id), 
+    os.path.join(opt["save_folder"], opt["save_name"]), "log.txt")
+
+    # Move all models to this GPU and make them distributed
+    for i in range(len(generators)):
+        generators[i].cuda(gpu_id)
+        generators[i].eval()
+        for param in generators[i].parameters():
+            param.requires_grad = False
+    
+    # Create the new generator and discriminator for this level
+    generator, num_kernels_this_scale = init_gen(len(generators)+1, opt)
+    generator = generator.cuda(gpu_id)
+    discriminator_s = init_discrim_s(len(generators)+1, opt).cuda(gpu_id)
+    discriminator_t = init_discrim_t(len(generators)+1, opt).cuda(gpu_id)
+
+    if(opt["train_distributed"]):
+        generator = nn.parallel.DistributedDataParallel(generator, device_ids=[gpu_id], find_unused_parameters=True)
+        discriminator_s = nn.parallel.DistributedDataParallel(discriminator_s, device_ids=[gpu_id], find_unused_parameters=True)
+        discriminator_t = nn.parallel.DistributedDataParallel(discriminator_t, device_ids=[gpu_id], find_unused_parameters=True)
+
+    if(process_num == 0):
+        print_to_log_and_console("Kernels this scale: %i" % num_kernels_this_scale, 
+            os.path.join(opt["save_folder"], opt["save_name"]), "log.txt")
+    num_kernels_factor = num_kernels_this_scale / opt["base_num_kernels"]
+
+    
+    '''
+    if(process_num == 0):
+        print_to_log_and_console(generator, 
+            os.path.join(opt["save_folder"], opt["save_name"]), "log.txt")
+        print_to_log_and_console(discriminator_s, 
+            os.path.join(opt["save_folder"], opt["save_name"]), "log.txt")
+        print_to_log_and_console(discriminator_t, 
+            os.path.join(opt["save_folder"], opt["save_name"]), "log.txt")
+        print_to_log_and_console("Minibatch size this scale: %i" % (minibatch_this_scale), 
+            os.path.join(opt["save_folder"], opt["save_name"]), "log.txt")
+    '''
+    
 
     generator_optimizer = optim.Adam(generator.parameters(), lr=opt["learning_rate"], betas=(opt["beta_1"],opt["beta_2"]))
     discriminator_s_optimizer = optim.Adam(discriminator_s.parameters(), lr=opt["learning_rate"], betas=(opt["beta_1"],opt["beta_2"]))
     discriminator_t_optimizer = optim.Adam(discriminator_t.parameters(), lr=opt["learning_rate"], betas=(opt["beta_1"],opt["beta_2"]))
-    generator_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer=generator_optimizer,milestones=[1600],gamma=opt["gamma"])
-    discriminator_s_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer=discriminator_s_optimizer,milestones=[1600],gamma=opt["gamma"])
-    discriminator_t_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer=discriminator_t_optimizer,milestones=[1600],gamma=opt["gamma"])
+    #generator_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer=generator_optimizer,milestones=[1600],gamma=opt["gamma"])
+    #discriminator_s_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer=discriminator_s_optimizer,milestones=[1600],gamma=opt["gamma"])
+    #discriminator_t_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer=discriminator_t_optimizer,milestones=[1600],gamma=opt["gamma"])
     
+    writer = SummaryWriter(os.path.join(opt["save_folder"], 'tensorboard', 
+    "%ikernels_%ilayers_%iminibatch_%iepochs_%.02fdownscaleratio" % (opt["base_num_kernels"], opt["num_blocks"], opt["minibatch"], opt["epochs"], opt["downscale_ratio"])))
+
     start_time = time.time()
+    next_save = 0
     images_seen = 0
     for epoch in range(opt["iteration_number"], opt["epochs"]):
         for i, (output_dataframes) in enumerate(dataloader):
@@ -356,8 +367,10 @@ def train_single_scale(process_num, generators, discriminators_s, discriminators
             # Get our minibatch on the gpu
             minibatch_size = output_dataframes.shape[0]
             output_dataframes = output_dataframes.cuda(non_blocking=True)
-            output_dataframes_this_scale = F.interpolate(output_dataframes.clone(), size=opt["scales"][len(generators)+1], mode=opt["downsample_mode"], align_corners=True)
-            
+            if(len(generators)+2 < len(opt["scales"])):
+                output_dataframes_this_scale = F.interpolate(output_dataframes.clone(), size=opt["scales"][len(generators)+1], mode=opt["downsample_mode"], align_corners=True)
+            else:
+                output_dataframes_this_scale = output_dataframes.clone()
             
             # Calculate the noise amplitude needed at this level            
             if(epoch == 0 and i == 0):
@@ -367,10 +380,11 @@ def train_single_scale(process_num, generators, discriminators_s, discriminators
                     reconstructed_frames =  F.interpolate(lowest_res, size=opt["scales"][1], mode=opt["upsample_mode"], align_corners=True)
                     noise_amp = torch.sqrt(criterion(reconstructed_frames, output_dataframes_this_scale)).item()
                 elif(len(generators) > 0):
-                    reconstructed_frames = generate(generators, opt, minibatch_size, "reconstruct", lowest_res, "cuda:"+str(gpu_id))
+                    reconstructed_frames = generate(generators, opt, minibatch_size, "reconstruct", lowest_res.clone(), "cuda:"+str(gpu_id))
                     reconstructed_frames = F.interpolate(reconstructed_frames, size=opt["scales"][len(generators)+1], mode=opt["upsample_mode"], align_corners=True)
                     noise_amp = torch.sqrt(criterion(reconstructed_frames, output_dataframes_this_scale)).item()
                 opt["noise_amplitudes"].append(noise_amp)
+                
 
 
             # Downsample it to the min scale
@@ -390,6 +404,9 @@ def train_single_scale(process_num, generators, discriminators_s, discriminators
             # Send input with noise through the current generator in training 
             generated_fake = generator(generated_fake, noise, opt["mode"])
             
+            if(i == 0 and epoch == 0):                
+                writer.add_graph(generator, [generated_fake, noise])
+            
             # Update discriminator: maximize D(x) + D(G(z))
             for j in range(opt["discriminator_steps"]):
 
@@ -407,47 +424,74 @@ def train_single_scale(process_num, generators, discriminators_s, discriminators
                 losses[1].append(discrim_error_fake.detach().item())
 
                 discriminator_s_optimizer.step()
-
+            
             # Update generator: maximize D(G(z))
             for j in range(opt["generator_steps"]):
                 generator.zero_grad()
+                
                 output = discriminator_s(generated_fake.detach())
                 generator_error = -output.mean()
                 generator_error.backward(retain_graph=True)
                 losses[2].append(discrim_error_fake.detach().item())
-
+                
                 loss = nn.MSELoss().cuda(gpu_id)
                 
                 # Generate reconstructed frames for this level
                 lowest_res = F.interpolate(output_dataframes.clone(), size=opt["scales"][0], mode=opt["downsample_mode"], align_corners=True)
                 if(len(generators) == 0):
-                    reconstructed_frames =  F.interpolate(lowest_res, size=opt["scales"][1], mode=opt["upsample_mode"], align_corners=True)
+                    reconstructed_frames =  F.interpolate(lowest_res.clone(), size=opt["scales"][1], mode=opt["upsample_mode"], align_corners=True)
                 elif(len(generators) > 0):
-                    reconstructed_frames = generate(generators, opt, minibatch_size, "reconstruct", lowest_res, "cuda:"+str(gpu_id))
+                    reconstructed_frames = generate(generators, opt, minibatch_size, "reconstruct", lowest_res.clone(), "cuda:"+str(gpu_id))
                     reconstructed_frames = F.interpolate(reconstructed_frames, size=opt["scales"][len(generators)+1], mode=opt["upsample_mode"], align_corners=True)
-                reconstructed_frames = generator(reconstructed_frames, torch.zeros(reconstructed_frames.shape, device=opt["device"][0]),opt["mode"])
-
-                rec_loss = opt["alpha"]*loss(reconstructed_frames, output_dataframes_this_scale)
+                reconstructed_frames = generator(reconstructed_frames.detach(), torch.zeros(reconstructed_frames.shape, device=opt["device"][0]),opt["mode"])
+                
+                
+                rec_loss = opt["alpha"]*torch.sqrt(loss(reconstructed_frames, output_dataframes_this_scale) + 0.00001)
                 rec_loss.backward(retain_graph=True)
                 losses[3].append(rec_loss.detach().item())
                 generator_optimizer.step()
-
+                
+            
             images_seen += minibatch_this_scale * len(opt["device"])
-            print_to_log_and_console("Level %i epoch [%i/%i] iteration[%i/%i]: %.04f images/sec" % (len(generators),epoch, opt["epochs"], i, total_minibatches, images_seen / (time.time() - start_time)), 
-                os.path.join(opt["save_folder"], opt["save_name"]), "log.txt")
-            print_to_log_and_console("Average discrim_real: %.04f discrim_fake: %.04f gen_err %.04f rec_err %.04f" % ((np.array(losses[0])).mean() / images_seen, 
-            (np.array(losses[1])).mean() / images_seen, (np.array(losses[2])).mean() / images_seen, (np.array(losses[3])).mean() / images_seen), 
-                os.path.join(opt["save_folder"], opt["save_name"]), "log.txt")
+            num_items = max(min(10, len(losses[3])), 1)
+            avg_discrim_real = sum(losses[0][-num_items:-1])/num_items
+            avg_discrim_fake = sum(losses[1][-num_items:-1])/num_items
+            avg_gen_fake = sum(losses[2][-num_items:-1])/num_items
+            avg_rec = sum(losses[3][-num_items:-1])/num_items
 
-        discriminator_s_scheduler.step()
-        generator_scheduler.step()
+            
+           
+            if images_seen > next_save:
+                fig, ax = save_training_graph(losses, len(generators), opt)
+                writer.add_scalar('Discrim_real_loss_%i' % len(generators), avg_discrim_real, images_seen)
+                writer.add_scalar('Discrim_fake_loss_%i' % len(generators), avg_discrim_fake, images_seen)
+                writer.add_scalar('Gen_loss_%i' % len(generators), avg_gen_fake, images_seen)
+                writer.add_scalar('Rec_loss_%i' % len(generators), avg_rec, images_seen)
+                next_save += 300
+                print_to_log_and_console("Level %i/%i epoch [%i/%i] iteration[%i/%i]: %.04f images/sec, Average discrim_real: %.04f discrim_fake: %.04f gen_err %.04f rec_err %.04f" % 
+                    (len(generators)+1, opt["n"]-1, 
+                    epoch+1, opt["epochs"], 
+                    i+1, total_minibatches, 
+                    images_seen / (time.time() - start_time),
+                    avg_discrim_real, avg_discrim_fake, 
+                    avg_gen_fake, avg_rec), 
+                    os.path.join(opt["save_folder"], opt["save_name"]), "log.txt")
 
+        #discriminator_s_scheduler.step()
+        #generator_scheduler.step()
+
+    fig, ax = save_training_graph(losses, len(generators), opt)
+    writer.add_scalar('Discrim_real_loss_%i' % len(generators), avg_discrim_real, images_seen)
+    writer.add_scalar('Discrim_fake_loss_%i' % len(generators), avg_discrim_fake, images_seen)
+    writer.add_scalar('Gen_loss_%i' % len(generators), avg_gen_fake, images_seen)
+    writer.add_scalar('Rec_loss_%i' % len(generators), avg_rec, images_seen)
+    writer.flush()
     generator = reset_grads(generator, False)
     generator.eval()
     discriminator_s = reset_grads(discriminator_s, False)
     discriminator_s.eval()
 
-    save_training_graph(losses, len(generators), opt)
+    writer.close()
 
     if(process_num == 0 and opt["train_distributed"]):
         generators.append(generator)
@@ -464,32 +508,32 @@ class MVTVSSR_Generator(nn.Module):
         self.resolution = resolution
         self.model = []
 
+        # Kernel_size must be odd to pad properly
+        required_padding = int(((kernel_size - 1) * (num_blocks+2)) / 2)
+        
         if(mode == "2D"):
             conv_layer = nn.Conv2d
             batchnorm_layer = nn.BatchNorm2d
-            self.padder = nn.ZeroPad2d(pre_padding)
+            self.padder = nn.ZeroPad2d(required_padding)
         elif(mode == "3D"):
             conv_layer = nn.Conv2d
             batchnorm_layer = nn.BatchNorm3d
-            self.padder = nn.ZeroPad3d(pre_padding)
+            self.padder = nn.ZeroPad3d(required_padding)
 
-        self.model.append(nn.Sequential(
-                conv_layer(num_channels, num_kernels, kernel_size=kernel_size, stride=stride, padding=layer_padding),
-                batchnorm_layer(num_kernels),
-                nn.LeakyReLU(0.2, inplace=True)))
+        self.model.append(conv_layer(num_channels, num_kernels, kernel_size=kernel_size, stride=stride, padding=layer_padding))
+        #self.model.append(batchnorm_layer(num_kernels))
+        self.model.append(nn.LeakyReLU(0.2, inplace=True))
         for i in range(num_blocks):
-            self.model.append(nn.Sequential(
-                conv_layer(num_kernels, num_kernels, kernel_size=kernel_size, stride=stride, padding=layer_padding),
-                batchnorm_layer(num_kernels),
-                nn.LeakyReLU(0.2, inplace=True)))
+            self.model.append(conv_layer(num_kernels, num_kernels, kernel_size=kernel_size, stride=stride, padding=layer_padding))
+            #self.model.append(batchnorm_layer(num_kernels))
+            self.model.append(nn.LeakyReLU(0.2, inplace=True))
 
-        self.model.append(nn.Sequential(
-                conv_layer(num_kernels, num_channels, kernel_size=kernel_size, stride=stride, padding=layer_padding),
-                nn.Tanh()))
+        self.model.append(conv_layer(num_kernels, num_channels, kernel_size=kernel_size, stride=stride, padding=layer_padding))
+        self.model.append(nn.Tanh())
 
         self.model = nn.Sequential(*self.model)
     
-    def forward(self, dataframe, noise, mode):
+    def forward(self, dataframe, noise, mode=None):
         dataframe_plus_noise = dataframe + noise
         padded_input = self.padder(dataframe_plus_noise)
         residual = self.model(padded_input)
@@ -525,7 +569,7 @@ class MVTVSSR_Spatial_Discriminator(nn.Module):
                     SpectralNorm(batchnorm_layer(num_kernels)),
                     nn.LeakyReLU(0.2, inplace=True)
                 ))
-            self.model.append(SpectralNorm(conv_layer(num_kernels, 1, kernel_size=kernel_size, stride=stride, padding=layer_padding)))
+            self.model.append(SpectralNorm(conv_layer(num_kernels, num_channels, kernel_size=kernel_size, stride=stride, padding=layer_padding)))
         else:
             self.model.append(
                 nn.Sequential(
@@ -542,7 +586,7 @@ class MVTVSSR_Spatial_Discriminator(nn.Module):
                     nn.LeakyReLU(0.2, inplace=True)
                 ))
 
-            self.model.append(conv_layer(num_kernels, 1, kernel_size=kernel_size, stride=stride, padding=layer_padding))
+            self.model.append(conv_layer(num_kernels, num_channels, kernel_size=kernel_size, stride=stride, padding=layer_padding))
 
         self.model = nn.Sequential(*self.model)
 
@@ -606,13 +650,15 @@ class MVTVSSR_Temporal_Discriminator(nn.Module):
         return out
 
 class Dataset(torch.utils.data.Dataset):
-  def __init__(self, dataset_location, num_training_examples):
+  def __init__(self, dataset_location, opt=None):
     self.dataset_location = dataset_location
-    self.num_training_examples = num_training_examples
     self.channel_mins = []
     self.channel_maxs = []
-    for index in range(num_training_examples):
+    self.num_training_examples = len(os.listdir(dataset_location))
+    for index in range(self.num_training_examples):
         data = np.load(os.path.join(self.dataset_location, str(index) + ".npy"))
+        if(opt is not None):
+            opt["num_channels"] = data.shape[0]
         if index == 0:
             for j in range(data.shape[0]):
                 self.channel_mins.append(np.min(data[j]))
@@ -637,10 +683,11 @@ class Dataset(torch.utils.data.Dataset):
   def __getitem__(self, index):
     data = np.load(os.path.join(self.dataset_location, str(index) + ".npy"))
     # Scale between [-1, 1] per channel for the dataset
-    for i in range(data.shape[0]):
+    for i in range(data.shape[0]):        
         data[i] -= self.channel_mins[i]
         data[i] *= (2/ (self.channel_maxs[i] - self.channel_mins[i]))
         data[i] -= 1 
+
     data = np2torch(data, "cpu")
     return data
 

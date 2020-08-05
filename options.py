@@ -6,11 +6,11 @@ class Options():
         opt = {}
         # Input info
         opt["mode"]                    = "2D"      # What SinGAN to use - 2D or 3D
-        opt["data_folder"]             = "CM1/train"
-        opt["num_training_examples"]   = 201
+        opt["data_folder"]             = "CM1_2/train"
+        opt["num_training_examples"]   = None
         opt["save_folder"]             = "SavedModels"
         opt["save_name"]               = "Temp"    # Folder that the model will be saved to
-        opt["num_channels"]            = 3
+        opt["num_channels"]            = None
         opt["downscale_ratio"]         = 0.5       # Downscale ratio between levels
         opt["min_dimension_size"]      = 32        # Smallest a dimension can go as the smallest level
         opt["train_date_time"]         = None      # The day/time the model was trained (finish time)
@@ -32,7 +32,7 @@ class Options():
         opt["downsample_mode"]         = "bilinear"
         opt["upsample_mode"]           = "bilinear"
 
-        opt["train_distributed"]       = True
+        opt["train_distributed"]       = False
         opt["device"]                  = [0]
         opt["gpus_per_node"]           = 1
         opt["num_nodes"]               = 1
