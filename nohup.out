@@ -1,0 +1,232 @@
+The model will have 3 scales
+Scale 2: [128, 128]
+Scale 1: [64, 64]
+Scale 0: [32, 32]
+Started training at 2020-08-05 23:01:51.270606
+2020-08-05 23:01:51.271609 - Beginning training on scale 0
+Process num 0 training on GPU 0
+Kernels this scale: 32
+Level 1/2 epoch [1/80] iteration[1/400]: 0.6725 images/sec, Average discrim_real: -0.0210 discrim_fake: 0.0205 gen_err 0.0216 rec_err 0.0189
+Level 1/2 epoch [1/80] iteration[301/400]: 3.6366 images/sec, Average discrim_real: -0.1393 discrim_fake: -0.0985 gen_err -0.1014 rec_err 0.0089
+Level 1/2 epoch [2/80] iteration[201/400]: 3.7499 images/sec, Average discrim_real: -0.2809 discrim_fake: -0.0906 gen_err -0.1018 rec_err 0.0086
+Level 1/2 epoch [3/80] iteration[101/400]: 3.7948 images/sec, Average discrim_real: -0.3103 discrim_fake: -0.0771 gen_err -0.0779 rec_err 0.0067
+Level 1/2 epoch [4/80] iteration[1/400]: 3.8178 images/sec, Average discrim_real: -0.3666 discrim_fake: -0.0256 gen_err -0.0274 rec_err 0.0059
+Level 1/2 epoch [4/80] iteration[301/400]: 3.8241 images/sec, Average discrim_real: -0.4350 discrim_fake: -0.0085 gen_err -0.0098 rec_err 0.0071
+Level 1/2 epoch [5/80] iteration[201/400]: 3.8162 images/sec, Average discrim_real: -0.4945 discrim_fake: 0.0518 gen_err 0.0478 rec_err 0.0045
+Level 1/2 epoch [6/80] iteration[101/400]: 3.8258 images/sec, Average discrim_real: -0.5370 discrim_fake: 0.0793 gen_err 0.0797 rec_err 0.0063
+Level 1/2 epoch [7/80] iteration[1/400]: 3.8326 images/sec, Average discrim_real: -0.5712 discrim_fake: 0.1161 gen_err 0.1148 rec_err 0.0054
+Level 1/2 epoch [7/80] iteration[301/400]: 3.8422 images/sec, Average discrim_real: -0.5804 discrim_fake: 0.1256 gen_err 0.1206 rec_err 0.0061
+Level 1/2 epoch [8/80] iteration[201/400]: 3.8488 images/sec, Average discrim_real: -0.6109 discrim_fake: 0.1336 gen_err 0.1334 rec_err 0.0068
+Level 1/2 epoch [9/80] iteration[101/400]: 3.8523 images/sec, Average discrim_real: -0.6203 discrim_fake: 0.1431 gen_err 0.1433 rec_err 0.0054
+Level 1/2 epoch [10/80] iteration[1/400]: 3.8562 images/sec, Average discrim_real: -0.6228 discrim_fake: 0.1699 gen_err 0.1690 rec_err 0.0059
+Level 1/2 epoch [10/80] iteration[301/400]: 3.8598 images/sec, Average discrim_real: -0.6329 discrim_fake: 0.1454 gen_err 0.1444 rec_err 0.0057
+Level 1/2 epoch [11/80] iteration[201/400]: 3.8626 images/sec, Average discrim_real: -0.6141 discrim_fake: 0.1895 gen_err 0.1840 rec_err 0.0013
+Level 1/2 epoch [12/80] iteration[101/400]: 3.8650 images/sec, Average discrim_real: -0.6301 discrim_fake: 0.1465 gen_err 0.1463 rec_err 0.0047
+Level 1/2 epoch [13/80] iteration[1/400]: 3.8673 images/sec, Average discrim_real: -0.6336 discrim_fake: 0.1579 gen_err 0.1558 rec_err 0.0057
+Level 1/2 epoch [13/80] iteration[301/400]: 3.8678 images/sec, Average discrim_realW0806 01:20:00.223605 21104 plugin_event_accumulator.py:294] Found more than one graph event per run, or there was a metagraph containing a graph_def, as well as one or more graph events.  Overwriting the graph with the newest event.
+W0806 01:20:00.223605 21104 plugin_event_accumulator.py:322] Found more than one "run metadata" event with tag step1. Overwriting it with the newest event.
+W0806 11:11:14.302432 21104 plugin_event_accumulator.py:294] Found more than one graph event per run, or there was a metagraph containing a graph_def, as well as one or more graph events.  Overwriting the graph with the newest event.
+W0806 11:11:14.302432 21104 plugin_event_accumulator.py:322] Found more than one "run metadata" event with tag step1. Overwriting it with the newest event.
+E0806 13:47:41.182029 21104 directory_watcher.py:189] Unable to get size of ./tensorboard\validation\bilinear\events.out.tfevents.1596735925.DESKTOP-NETT0QE.12100.0: ./tensorboard\validation\bilinear\events.out.tfevents.1596735925.DESKTOP-NETT0QE.12100.0; No such file or directory
+W0806 14:10:42.907201 21104 plugin_event_multiplexer.py:250] Deleting accumulator 'testing\\16kernels_8layers_1minibatch_80epochs_0.50downscaleratio'
+Level 1/2 epoch [20/80] iteration[201/400]: 3.8795 images/sec, Average discrim_real: -0.6344 discrim_fake: 0.1543 gen_err 0.1512 rec_err 0.0056
+Level 1/2 epoch [21/80] iteration[101/400]: 3.8796 images/sec, Average discrim_real: -0.6352 discrim_fake: 0.1615 gen_err 0.1589 rec_err 0.0039
+Level 1/2 epoch [22/80] iteration[1/400]: 3.8784 images/sec, Average discrim_real: -0.5972 discrim_fake: 0.1825 gen_err 0.1722 rec_err 0.0036
+Level 1/2 epoch [22/80] iteration[301/400]: 3.8764 images/sec, Average discrim_real: -0.6377 discrim_fake: 0.1705 gen_err 0.1657 rec_err 0.0033
+Level 1/2 epoch [23/80] iteration[201/400]: 3.8746 images/sec, Average discrim_real: -0.6376 discrim_fake: 0.1505 gen_err 0.1509 rec_err 0.0042
+Level 1/2 epoch [24/80] iteration[101/400]: 3.8729 images/sec, Average discrim_real: -0.6394 discrim_fake: 0.1510 gen_err 0.1506 rec_err 0.0041
+Level 1/2 epoch [25/80] iteration[1/400]: 3.8708 images/sec, Average discrim_real: -0.6385 discrim_fake: 0.1654 gen_err 0.1629 rec_err 0.0007
+Level 1/2 epoch [25/80] iteration[301/400]: 3.8687 images/sec, Average discrim_real: -0.6372 discrim_fake: 0.1549 gen_err 0.1535 rec_err 0.0031
+Level 1/2 epoch [26/80] iteration[201/400]: 3.8669 images/sec, Average discrim_real: -0.6384 discrim_fake: 0.1563 gen_err 0.1533 rec_err 0.0036
+Level 1/2 epoch [27/80] iteration[101/400]: 3.8650 images/sec, Average discrim_real: -0.6397 discrim_fake: 0.1555 gen_err 0.1541 rec_err 0.0037
+Level 1/2 epoch [28/80] iteration[1/400]: 3.8633 images/sec, Average discrim_real: -0.6360 discrim_fake: 0.1480 gen_err 0.1472 rec_err 0.0045
+Level 1/2 epoch [28/80] iteration[301/400]: 3.8617 images/sec, Average discrim_real: -0.6326 discrim_fake: 0.1557 gen_err 0.1533 rec_err 0.0023
+Level 1/2 epoch [29/80] iteration[201/400]: 3.8602 images/sec, Average discrim_real: -0.6337 discrim_fake: 0.2681 gen_err 0.2662 rec_err 0.0016
+Level 1/2 epoch [30/80] iteration[101/400]: 3.8590 images/sec, Average discrim_real: -0.6373 discrim_fake: 0.1681 gen_err 0.1637 rec_err 0.0019
+Level 1/2 epoch [31/80] iteration[1/400]: 3.8575 images/sec, Average discrim_real: -0.6381 discrim_fake: 0.1536 gen_err 0.1519 rec_err 0.0046
+Level 1/2 epoch [31/80] iteration[301/400]: 3.8563 images/sec, Average discrim_real: -0.6370 discrim_fake: 0.1586 gen_err 0.1576 rec_err 0.0029
+Level 1/2 epoch [32/80] iteration[201/400]: 3.8550 images/sec, Average discrim_real: -0.6389 discrim_fake: 0.1604 gen_err 0.1566 rec_err 0.0048
+Level 1/2 epoch [33/80] iteration[101/400]: 3.8540 images/sec, Average discrim_real: -0.6376 discrim_fake: 0.1594 gen_err 0.1560 rec_err 0.0032
+Level 1/2 epoch [34/80] iteration[1/400]: 3.8530 images/sec, Average discrim_real: -0.6347 discrim_fake: 0.1539 gen_err 0.1518 rec_err 0.0024
+Level 1/2 epoch [34/80] iteration[301/400]: 3.8519 images/sec, Average discrim_real: -0.6393 discrim_fake: 0.1566 gen_err 0.1558 rec_err 0.0021
+Level 1/2 epoch [35/80] iteration[201/400]: 3.8510 images/sec, Average discrim_real: -0.6380 discrim_fake: 0.1562 gen_err 0.1546 rec_err 0.0028
+Level 1/2 epoch [36/80] iteration[101/400]: 3.8500 images/sec, Average discrim_real: -0.6345 discrim_fake: 0.1499 gen_err 0.1481 rec_err 0.0039
+Level 1/2 epoch [37/80] iteration[1/400]: 3.8491 images/sec, Average discrim_real: -0.6344 discrim_fake: 0.1618 gen_err 0.1584 rec_err 0.0035
+Level 1/2 epoch [37/80] iteration[301/400]: 3.8482 images/sec, Average discrim_real: -0.6356 discrim_fake: 0.1537 gen_err 0.1529 rec_err 0.0035
+Level 1/2 epoch [38/80] iteration[201/400]: 3.8473 images/sec, Average discrim_real: -0.6361 discrim_fake: 0.1507 gen_err 0.1485 rec_err 0.0052
+Level 1/2 epoch [39/80] iteration[101/400]: 3.8466 images/sec, Average discrim_real: -0.6391 discrim_fake: 0.1575 gen_err 0.1572 rec_err 0.0042
+Level 1/2 epoch [40/80] iteration[1/400]: 3.8468 images/sec, Average discrim_real: -0.5867 discrim_fake: 0.1763 gen_err 0.1526 rec_err 0.0045
+Level 1/2 epoch [40/80] iteration[301/400]: 3.8468 images/sec, Average discrim_real: -0.6371 discrim_fake: 0.1553 gen_err 0.1525 rec_err 0.0042
+Level 1/2 epoch [41/80] iteration[201/400]: 3.8467 images/sec, Average discrim_real: -0.6376 discrim_fake: 0.1509 gen_err 0.1505 rec_err 0.0039
+Level 1/2 epoch [42/80] iteration[101/400]: 3.8465 images/sec, Average discrim_real: -0.6405 discrim_fake: 0.1513 gen_err 0.1522 rec_err 0.0037
+Level 1/2 epoch [43/80] iteration[1/400]: 3.8463 images/sec, Average discrim_real: -0.6380 discrim_fake: 0.1604 gen_err 0.1571 rec_err 0.0047
+Level 1/2 epoch [43/80] iteration[301/400]: 3.8461 images/sec, Average discrim_real: -0.6381 discrim_fake: 0.1552 gen_err 0.1530 rec_err 0.0035
+Level 1/2 epoch [44/80] iteration[201/400]: 3.8467 images/sec, Average discrim_real: -0.6375 discrim_fake: 0.1568 gen_err 0.1534 rec_err 0.0040
+Level 1/2 epoch [45/80] iteration[101/400]: 3.8472 images/sec, Average discrim_real: -0.6397 discrim_fake: 0.1511 gen_err 0.1506 rec_err 0.0033
+Level 1/2 epoch [46/80] iteration[1/400]: 3.8474 images/sec, Average discrim_real: -0.6371 discrim_fake: 0.1480 gen_err 0.1476 rec_err 0.0037
+Level 1/2 epoch [46/80] iteration[301/400]: 3.8477 images/sec, Average discrim_real: -0.6395 discrim_fake: 0.1500 gen_err 0.1502 rec_err 0.0030
+Level 1/2 epoch [47/80] iteration[201/400]: 3.8482 images/sec, Average discrim_real: -0.6401 discrim_fake: 0.1583 gen_err 0.1567 rec_err 0.0040
+Level 1/2 epoch [48/80] iteration[101/400]: 3.8487 images/sec, Average discrim_real: -0.5779 discrim_fake: 0.1617 gen_err 0.1591 rec_err 0.0052
+Level 1/2 epoch [49/80] iteration[1/400]: 3.8491 images/sec, Average discrim_real: -0.6391 discrim_fake: 0.1522 gen_err 0.1521 rec_err 0.0032
+Level 1/2 epoch [49/80] iteration[301/400]: 3.8496 images/sec, Average discrim_real: -0.6390 discrim_fake: 0.1536 gen_err 0.1518 rec_err 0.0030
+Level 1/2 epoch [50/80] iteration[201/400]: 3.8496 images/sec, Average discrim_real: -0.6389 discrim_fake: 0.1529 gen_err 0.1519 rec_err 0.0038
+Level 1/2 epoch [51/80] iteration[101/400]: 3.8497 images/sec, Average discrim_real: -0.6396 discrim_fake: 0.1529 gen_err 0.1528 rec_err 0.0026
+Level 1/2 epoch [52/80] iteration[1/400]: 3.8501 images/sec, Average discrim_real: -0.6386 discrim_fake: 0.1511 gen_err 0.1510 rec_err 0.0038
+Level 1/2 epoch [52/80] iteration[301/400]: 3.8506 images/sec, Average discrim_real: -0.6414 discrim_fake: 0.1509 gen_err 0.1512 rec_err 0.0032
+Level 1/2 epoch [53/80] iteration[201/400]: 3.8512 images/sec, Average discrim_real: -0.6404 discrim_fake: 0.1584 gen_err 0.1565 rec_err 0.0027
+Level 1/2 epoch [54/80] iteration[101/400]: 3.8518 images/sec, Average discrim_real: -0.6403 discrim_fake: 0.1522 gen_err 0.1514 rec_err 0.0015
+Level 1/2 epoch [55/80] iteration[1/400]: 3.8524 images/sec, Average discrim_real: -0.6407 discrim_fake: 0.1528 gen_err 0.1527 rec_err 0.0048
+Level 1/2 epoch [55/80] iteration[301/400]: 3.8529 images/sec, Average discrim_real: -0.6408 discrim_fake: 0.1515 gen_err 0.1540 rec_err 0.0033
+Level 1/2 epoch [56/80] iteration[201/400]: 3.8533 images/sec, Average discrim_real: -0.6415 discrim_fake: 0.1507 gen_err 0.1511 rec_err 0.0034
+Level 1/2 epoch [57/80] iteration[101/400]: 3.8539 images/sec, Average discrim_real: -0.5824 discrim_fake: 0.3192 gen_err 0.2499 rec_err 0.0022
+Level 1/2 epoch [58/80] iteration[1/400]: 3.8544 images/sec, Average discrim_real: -0.6091 discrim_fake: 0.2304 gen_err 0.2341 rec_err 0.0031
+Level 1/2 epoch [58/80] iteration[301/400]: 3.8549 images/sec, Average discrim_real: -0.6385 discrim_fake: 0.1507 gen_err 0.1495 rec_err 0.0036
+Level 1/2 epoch [59/80] iteration[201/400]: 3.8554 images/sec, Average discrim_real: -0.6398 discrim_fake: 0.1487 gen_err 0.1494 rec_err 0.0032
+Level 1/2 epoch [60/80] iteration[101/400]: 3.8559 images/sec, Average discrim_real: -0.6401 discrim_fake: 0.1621 gen_err 0.1590 rec_err 0.0031
+Level 1/2 epoch [61/80] iteration[1/400]: 3.8564 images/sec, Average discrim_real: -0.6395 discrim_fake: 0.1512 gen_err 0.1490 rec_err 0.0040
+Level 1/2 epoch [61/80] iteration[301/400]: 3.8568 images/sec, Average discrim_real: -0.6448 discrim_fake: 0.1568 gen_err 0.1565 rec_err 0.0033
+Level 1/2 epoch [62/80] iteration[201/400]: 3.8574 images/sec, Average discrim_real: -0.6388 discrim_fake: 0.1544 gen_err 0.1534 rec_err 0.0036
+Level 1/2 epoch [63/80] iteration[101/400]: 3.8578 images/sec, Average discrim_real: -0.6404 discrim_fake: 0.1556 gen_err 0.1539 rec_err 0.0028
+Level 1/2 epoch [64/80] iteration[1/400]: 3.8583 images/sec, Average discrim_real: -0.6410 discrim_fake: 0.1535 gen_err 0.1526 rec_err 0.0032
+Level 1/2 epoch [64/80] iteration[301/400]: 3.8587 images/sec, Average discrim_real: -0.6382 discrim_fake: 0.1531 gen_err 0.1540 rec_err 0.0016
+Level 1/2 epoch [65/80] iteration[201/400]: 3.8591 images/sec, Average discrim_real: -0.6384 discrim_fake: 0.1517 gen_err 0.1513 rec_err 0.0017
+Level 1/2 epoch [66/80] iteration[101/400]: 3.8595 images/sec, Average discrim_real: -0.6414 discrim_fake: 0.1513 gen_err 0.1509 rec_err 0.0047
+Level 1/2 epoch [67/80] iteration[1/400]: 3.8599 images/sec, Average discrim_real: -0.5605 discrim_fake: 0.2018 gen_err 0.1824 rec_err 0.0021
+Level 1/2 epoch [67/80] iteration[301/400]: 3.8603 images/sec, Average discrim_real: -0.6407 discrim_fake: 0.1506 gen_err 0.1504 rec_err 0.0028
+Level 1/2 epoch [68/80] iteration[201/400]: 3.8607 images/sec, Average discrim_real: -0.6384 discrim_fake: 0.1496 gen_err 0.1514 rec_err 0.0028
+Level 1/2 epoch [69/80] iteration[101/400]: 3.8610 images/sec, Average discrim_real: -0.6420 discrim_fake: 0.1511 gen_err 0.1501 rec_err 0.0029
+Level 1/2 epoch [70/80] iteration[1/400]: 3.8613 images/sec, Average discrim_real: -0.6406 discrim_fake: 0.1503 gen_err 0.1494 rec_err 0.0034
+Level 1/2 epoch [70/80] iteration[301/400]: 3.8617 images/sec, Average discrim_real: -0.6403 discrim_fake: 0.1512 gen_err 0.1510 rec_err 0.0033
+Level 1/2 epoch [71/80] iteration[201/400]: 3.8620 images/sec, Average discrim_real: -0.6400 discrim_fake: 0.1509 gen_err 0.1513 rec_err 0.0041
+Level 1/2 epoch [72/80] iteration[101/400]: 3.8624 images/sec, Average discrim_real: -0.6407 discrim_fake: 0.1508 gen_err 0.1501 rec_err 0.0035
+Level 1/2 epoch [73/80] iteration[1/400]: 3.8628 images/sec, Average discrim_real: -0.6411 discrim_fake: 0.1506 gen_err 0.1518 rec_err 0.0030
+Level 1/2 epoch [73/80] iteration[301/400]: 3.8631 images/sec, Average discrim_real: -0.6411 discrim_fake: 0.1520 gen_err 0.1533 rec_err 0.0028
+Level 1/2 epoch [74/80] iteration[201/400]: 3.8634 images/sec, Average discrim_real: -0.6398 discrim_fake: 0.1524 gen_err 0.1512 rec_err 0.0031
+Level 1/2 epoch [75/80] iteration[101/400]: 3.8638 images/sec, Average discrim_real: -0.6412 discrim_fake: 0.1503 gen_err 0.1501 rec_err 0.0034
+Level 1/2 epoch [76/80] iteration[1/400]: 3.8642 images/sec, Average discrim_real: -0.6389 discrim_fake: 0.1588 gen_err 0.1582 rec_err 0.0028
+Level 1/2 epoch [76/80] iteration[301/400]: 3.8645 images/sec, Average discrim_real: -0.6382 discrim_fake: 0.1550 gen_err 0.1546 rec_err 0.0007
+Level 1/2 epoch [77/80] iteration[201/400]: 3.8648 images/sec, Average discrim_real: -0.6370 discrim_fake: 0.1508 gen_err 0.1498 rec_err 0.0024
+Level 1/2 epoch [78/80] iteration[101/400]: 3.8650 images/sec, Average discrim_real: -0.6401 discrim_fake: 0.1486 gen_err 0.1501 rec_err 0.0035
+Level 1/2 epoch [79/80] iteration[1/400]: 3.8654 images/sec, Average discrim_real: -0.6394 discrim_fake: 0.1495 gen_err 0.1488 rec_err 0.0025
+Level 1/2 epoch [79/80] iteration[301/400]: 3.8657 images/sec, Average discrim_real: -0.6413 discrim_fake: 0.1503 gen_err 0.1512 rec_err 0.0025
+Level 1/2 epoch [80/80] iteration[201/400]: 3.8659 images/sec, Average discrim_real: -0.6418 discrim_fake: 0.1552 gen_err 0.1531 rec_err 0.0019
+2020-08-06 01:19:55.449605 - Finished training in scale 0 in 138.069633 minutes
+2020-08-06 01:19:55.449605 - Beginning training on scale 1
+Process num 0 training on GPU 0
+Kernels this scale: 38
+Level 2/2 epoch [1/80] iteration[1/400]: 2.6738 images/sec, Average discrim_real: -0.0028 discrim_fake: 0.0001 gen_err -0.0142 rec_err 0.0047
+Level 2/2 epoch [1/80] iteration[301/400]: 3.5144 images/sec, Average discrim_real: 0.0040 discrim_fake: -0.3378 gen_err -0.3380 rec_err 0.0411
+Level 2/2 epoch [2/80] iteration[201/400]: 3.5156 images/sec, Average discrim_real: 0.0001 discrim_fake: -0.3406 gen_err -0.3417 rec_err 0.0213
+Level 2/2 epoch [3/80] iteration[101/400]: 3.5148 images/sec, Average discrim_real: 0.1854 discrim_fake: -0.3277 gen_err -0.3282 rec_err 0.0162
+Level 2/2 epoch [4/80] iteration[1/400]: 3.5156 images/sec, Average discrim_real: 0.0002 discrim_fake: -0.3421 gen_err -0.3428 rec_err 0.0180
+Level 2/2 epoch [4/80] iteration[301/400]: 3.5159 images/sec, Average discrim_real: 0.0015 discrim_fake: -0.3292 gen_err -0.3374 rec_err 0.0151
+Level 2/2 epoch [5/80] iteration[201/400]: 3.5162 images/sec, Average discrim_real: -0.0009 discrim_fake: -0.3365 gen_err -0.3365 rec_err 0.0150
+Level 2/2 epoch [6/80] iteration[101/400]: 3.5158 images/sec, Average discrim_real: -0.0019 discrim_fake: -0.3449 gen_err -0.3450 rec_err 0.0161
+Level 2/2 epoch [7/80] iteration[1/400]: 3.5160 images/sec, Average discrim_real: -0.0015 discrim_fake: -0.3334 gen_err -0.3339 rec_err 0.0112
+Level 2/2 epoch [7/80] iteration[301/400]: 3.5157 images/sec, Average discrim_real: -0.0017 discrim_fake: -0.3401 gen_err -0.3412 rec_err 9.0171
+Level 2/2 epoch [8/80] iteration[201/400]: 3.5156 images/sec, Average discrim_real: -0.0033 discrim_fake: -0.3483 gen_err -0.3486 rec_err 9.0396
+Level 2/2 epoch [9/80] iteration[101/400]: 3.5151 images/sec, Average discrim_real: -0.0042 discrim_fake: -0.3477 gen_err -0.3479 rec_err 9.0381
+Level 2/2 epoch [10/80] iteration[1/400]: 3.5147 images/sec, Average discrim_real: -0.0037 discrim_fake: -0.3478 gen_err -0.3479 rec_err 9.0313
+Level 2/2 epoch [10/80] iteration[301/400]: 3.5146 images/sec, Average discrim_real: -0.0051 discrim_fake: -0.3489 gen_err -0.3492 rec_err 9.0418
+Level 2/2 epoch [11/80] iteration[201/400]: 3.5145 images/sec, Average discrim_real: -0.0040 discrim_fake: -0.3433 gen_err -0.3435 rec_err 9.0164
+Level 2/2 epoch [12/80] iteration[101/400]: 3.5144 images/sec, Average discrim_real: -0.0017 discrim_fake: -0.2843 gen_err -0.3196 rec_err 9.0053
+Level 2/2 epoch [13/80] iteration[1/400]: 3.5145 images/sec, Average discrim_real: -0.0048 discrim_fake: -0.3461 gen_err -0.3465 rec_err 9.0274
+Level 2/2 epoch [13/80] iteration[301/400]: 3.5144 images/sec, Average discrim_real: 0.0004 discrim_fake: -0.3388 gen_err -0.3403 rec_err 9.0218
+Level 2/2 epoch [14/80] iteration[201/400]: 3.5144 images/sec, Average discrim_real: -0.0053 discrim_fake: -0.3480 gen_err -0.3486 rec_err 9.0284
+Level 2/2 epoch [15/80] iteration[101/400]: 3.5144 images/sec, Average discrim_real: -0.0054 discrim_fake: -0.3489 gen_err -0.3491 rec_err 9.0332
+Level 2/2 epoch [16/80] iteration[1/400]: 3.5141 images/sec, Average discrim_real: 0.0040 discrim_fake: -0.3215 gen_err -0.3221 rec_err 9.0230
+Level 2/2 epoch [16/80] iteration[301/400]: 3.5141 images/sec, Average discrim_real: -0.0052 discrim_fake: -0.3487 gen_err -0.3488 rec_err 9.0194
+Level 2/2 epoch [17/80] iteration[201/400]: 3.5142 images/sec, Average discrim_real: -0.0043 discrim_fake: -0.3461 gen_err -0.3467 rec_err 9.0284
+Level 2/2 epoch [18/80] iteration[101/400]: 3.5140 images/sec, Average discrim_real: -0.0052 discrim_fake: -0.3444 gen_err -0.3452 rec_err 9.0310
+Level 2/2 epoch [19/80] iteration[1/400]: 3.5141 images/sec, Average discrim_real: -0.0049 discrim_fake: -0.3481 gen_err -0.3477 rec_err 9.0062
+Level 2/2 epoch [19/80] iteration[301/400]: 3.5141 images/sec, Average discrim_real: -0.0059 discrim_fake: -0.3497 gen_err -0.3497 rec_err 9.0345
+Level 2/2 epoch [20/80] iteration[201/400]: 3.5139 images/sec, Average discrim_real: -0.0024 discrim_fake: -0.3461 gen_err -0.3464 rec_err 9.0163
+Level 2/2 epoch [21/80] iteration[101/400]: 3.5137 images/sec, Average discrim_real: -0.0053 discrim_fake: -0.3478 gen_err -0.3480 rec_err 9.0367
+Level 2/2 epoch [22/80] iteration[1/400]: 3.5136 images/sec, Average discrim_real: -0.0045 discrim_fake: -0.3492 gen_err -0.3494 rec_err 9.0343
+Level 2/2 epoch [22/80] iteration[301/400]: 3.5136 images/sec, Average discrim_real: -0.0050 discrim_fake: -0.3486 gen_err -0.3487 rec_err 9.0254
+Level 2/2 epoch [23/80] iteration[201/400]: 3.5138 images/sec, Average discrim_real: -0.0049 discrim_fake: -0.3470 gen_err -0.3472 rec_err 9.0134
+Level 2/2 epoch [24/80] iteration[101/400]: 3.5139 images/sec, Average discrim_real: -0.0051 discrim_fake: -0.3488 gen_err -0.3488 rec_err 9.0232
+Level 2/2 epoch [25/80] iteration[1/400]: 3.5140 images/sec, Average discrim_real: -0.0046 discrim_fake: -0.3502 gen_err -0.3502 rec_err 9.0291
+Level 2/2 epoch [25/80] iteration[301/400]: 3.5142 images/sec, Average discrim_real: -0.0055 discrim_fake: -0.3502 gen_err -0.3501 rec_err 9.0255
+Level 2/2 epoch [26/80] iteration[201/400]: 3.5143 images/sec, Average discrim_real: -0.0054 discrim_fake: -0.3504 gen_err -0.3504 rec_err 9.0185
+Level 2/2 epoch [27/80] iteration[101/400]: 3.5144 images/sec, Average discrim_real: -0.0056 discrim_fake: -0.3458 gen_err -0.3462 rec_err 9.0185
+Level 2/2 epoch [28/80] iteration[1/400]: 3.5145 images/sec, Average discrim_real: -0.0050 discrim_fake: -0.3463 gen_err -0.3466 rec_err 9.0068
+Level 2/2 epoch [28/80] iteration[301/400]: 3.5145 images/sec, Average discrim_real: -0.0062 discrim_fake: -0.3496 gen_err -0.3496 rec_err 9.0345
+Level 2/2 epoch [29/80] iteration[201/400]: 3.5146 images/sec, Average discrim_real: -0.0053 discrim_fake: -0.3457 gen_err -0.3465 rec_err 9.0237
+Level 2/2 epoch [30/80] iteration[101/400]: 3.5147 images/sec, Average discrim_real: -0.0059 discrim_fake: -0.3483 gen_err -0.3485 rec_err 9.0051
+Level 2/2 epoch [31/80] iteration[1/400]: 3.5149 images/sec, Average discrim_real: -0.0061 discrim_fake: -0.3203 gen_err -0.3213 rec_err 9.0082
+Level 2/2 epoch [31/80] iteration[301/400]: 3.5149 images/sec, Average discrim_real: -0.0067 discrim_fake: -0.3490 gen_err -0.3490 rec_err 9.0367
+Level 2/2 epoch [32/80] iteration[201/400]: 3.5149 images/sec, Average discrim_real: -0.0065 discrim_fake: -0.3484 gen_err -0.3486 rec_err 9.0000
+Level 2/2 epoch [33/80] iteration[101/400]: 3.5152 images/sec, Average discrim_real: -0.0067 discrim_fake: -0.3490 gen_err -0.3489 rec_err 9.0311
+Level 2/2 epoch [34/80] iteration[1/400]: 3.5152 images/sec, Average discrim_real: -0.0054 discrim_fake: -0.3462 gen_err -0.3467 rec_err 9.0159
+Level 2/2 epoch [34/80] iteration[301/400]: 3.5153 images/sec, Average discrim_real: -0.0071 discrim_fake: -0.3486 gen_err -0.3488 rec_err 9.0276
+Level 2/2 epoch [35/80] iteration[201/400]: 3.5153 images/sec, Average discrim_real: -0.0071 discrim_fake: -0.3490 gen_err -0.3492 rec_err 9.0086
+Level 2/2 epoch [36/80] iteration[101/400]: 3.5153 images/sec, Average discrim_real: -0.0071 discrim_fake: -0.3488 gen_err -0.3482 rec_err 9.0278
+Level 2/2 epoch [37/80] iteration[1/400]: 3.5154 images/sec, Average discrim_real: -0.0074 discrim_fake: -0.3487 gen_err -0.3487 rec_err 9.0351
+Level 2/2 epoch [37/80] iteration[301/400]: 3.5154 images/sec, Average discrim_real: -0.0073 discrim_fake: -0.3470 gen_err -0.3472 rec_err 9.0252
+Level 2/2 epoch [38/80] iteration[201/400]: 3.5154 images/sec, Average discrim_real: -0.0072 discrim_fake: -0.3457 gen_err -0.3461 rec_err 9.0225
+Level 2/2 epoch [39/80] iteration[101/400]: 3.5156 images/sec, Average discrim_real: -0.0077 discrim_fake: -0.3477 gen_err -0.3479 rec_err 9.0267
+Level 2/2 epoch [40/80] iteration[1/400]: 3.5155 images/sec, Average discrim_real: 0.0100 discrim_fake: -0.2230 gen_err -0.2100 rec_err 9.0123
+Level 2/2 epoch [40/80] iteration[301/400]: 3.5156 images/sec, Average discrim_real: -0.0080 discrim_fake: -0.3477 gen_err -0.3478 rec_err 9.0292
+Level 2/2 epoch [41/80] iteration[201/400]: 3.5156 images/sec, Average discrim_real: -0.0079 discrim_fake: -0.3480 gen_err -0.3483 rec_err 9.0303
+Level 2/2 epoch [42/80] iteration[101/400]: 3.5155 images/sec, Average discrim_real: -0.0079 discrim_fake: -0.3477 gen_err -0.3479 rec_err 9.0189
+Level 2/2 epoch [43/80] iteration[1/400]: 3.5156 images/sec, Average discrim_real: -0.0080 discrim_fake: -0.3482 gen_err -0.3484 rec_err 9.0148
+Level 2/2 epoch [43/80] iteration[301/400]: 3.5157 images/sec, Average discrim_real: -0.0080 discrim_fake: -0.3470 gen_err -0.3479 rec_err 9.0161
+Level 2/2 epoch [44/80] iteration[201/400]: 3.5158 images/sec, Average discrim_real: -0.0082 discrim_fake: -0.3480 gen_err -0.3481 rec_err 9.0409
+Level 2/2 epoch [45/80] iteration[101/400]: 3.5158 images/sec, Average discrim_real: -0.0083 discrim_fake: -0.3467 gen_err -0.3469 rec_err 9.0239
+C:\Users\Skylar\Documents\GitHub\MVTVSSR\model.py:247: UserWarning: Attempting to set identical bottom == top == 0.032446302473545074 results in singular transformations; automatically expanding.
+  ax[2].set_ylim(min(losses[2]), max(losses[2]))
+C:\Users\Skylar\AppData\Roaming\Python\Python36\site-packages\piq\utils\common.py:15: UserWarning: Expected input tensor <class 'torch.FloatTensor'>, got torch.cuda.FloatTensor.
+  warnings.warn(f'Expected input tensor {torch.FloatTensor}, got {tensor.type()}.')
+C:\Users\Skylar\Documents\GitHub\MVTVSSR\model.py:247: UserWarning: Attempting to set identical bottom == top == -0.021284183487296104 results in singular transformations; automatically expanding.
+  ax[2].set_ylim(min(losses[2]), max(losses[2]))
+Level 2/2 epoch [46/80] iteration[1/400]: 3.5158 images/sec, Average discrim_real: -0.0079 discrim_fake: -0.3475 gen_err -0.3477 rec_err 9.0132
+Level 2/2 epoch [46/80] iteration[301/400]: 3.5159 images/sec, Average discrim_real: -0.0085 discrim_fake: -0.3482 gen_err -0.3484 rec_err 9.0305
+Level 2/2 epoch [47/80] iteration[201/400]: 3.5159 images/sec, Average discrim_real: -0.0084 discrim_fake: -0.3473 gen_err -0.3472 rec_err 9.0280
+Level 2/2 epoch [48/80] iteration[101/400]: 3.5159 images/sec, Average discrim_real: -0.0086 discrim_fake: -0.3482 gen_err -0.3481 rec_err 9.0331
+Level 2/2 epoch [49/80] iteration[1/400]: 3.5159 images/sec, Average discrim_real: -0.0084 discrim_fake: -0.3469 gen_err -0.3472 rec_err 9.0217
+Level 2/2 epoch [49/80] iteration[301/400]: 3.5159 images/sec, Average discrim_real: -0.0086 discrim_fake: -0.3481 gen_err -0.3481 rec_err 9.0388
+Level 2/2 epoch [50/80] iteration[201/400]: 3.5159 images/sec, Average discrim_real: -0.0087 discrim_fake: -0.3481 gen_err -0.3480 rec_err 9.0350
+Level 2/2 epoch [51/80] iteration[101/400]: 3.5159 images/sec, Average discrim_real: -0.0086 discrim_fake: -0.3475 gen_err -0.3477 rec_err 9.0199
+Level 2/2 epoch [52/80] iteration[1/400]: 3.5159 images/sec, Average discrim_real: -0.0085 discrim_fake: -0.3478 gen_err -0.3478 rec_err 9.0106
+Level 2/2 epoch [52/80] iteration[301/400]: 3.5159 images/sec, Average discrim_real: -0.0088 discrim_fake: -0.3475 gen_err -0.3476 rec_err 9.0267
+Level 2/2 epoch [53/80] iteration[201/400]: 3.5159 images/sec, Average discrim_real: -0.0085 discrim_fake: -0.3470 gen_err -0.3468 rec_err 9.0218
+Level 2/2 epoch [54/80] iteration[101/400]: 3.5159 images/sec, Average discrim_real: -0.0080 discrim_fake: -0.3211 gen_err -0.3214 rec_err 9.0283
+Level 2/2 epoch [55/80] iteration[1/400]: 3.5158 images/sec, Average discrim_real: -0.0089 discrim_fake: -0.3460 gen_err -0.3461 rec_err 9.0146
+Level 2/2 epoch [55/80] iteration[301/400]: 3.5156 images/sec, Average discrim_real: -0.0088 discrim_fake: -0.3472 gen_err -0.3472 rec_err 9.0316
+Level 2/2 epoch [56/80] iteration[201/400]: 3.5157 images/sec, Average discrim_real: -0.0087 discrim_fake: -0.3456 gen_err -0.3458 rec_err 9.0341
+Level 2/2 epoch [57/80] iteration[101/400]: 3.5156 images/sec, Average discrim_real: -0.0089 discrim_fake: -0.3466 gen_err -0.3468 rec_err 9.0275
+Level 2/2 epoch [58/80] iteration[1/400]: 3.5156 images/sec, Average discrim_real: -0.0089 discrim_fake: -0.3470 gen_err -0.3472 rec_err 9.0230
+Level 2/2 epoch [58/80] iteration[301/400]: 3.5156 images/sec, Average discrim_real: -0.0087 discrim_fake: -0.3463 gen_err -0.3467 rec_err 9.0000
+Level 2/2 epoch [59/80] iteration[201/400]: 3.5157 images/sec, Average discrim_real: -0.0090 discrim_fake: -0.3436 gen_err -0.3441 rec_err 9.0125
+Level 2/2 epoch [60/80] iteration[101/400]: 3.5157 images/sec, Average discrim_real: -0.0091 discrim_fake: -0.3470 gen_err -0.3472 rec_err 9.0365
+Level 2/2 epoch [61/80] iteration[1/400]: 3.5157 images/sec, Average discrim_real: -0.0091 discrim_fake: -0.3294 gen_err -0.3301 rec_err 9.0319
+Level 2/2 epoch [61/80] iteration[301/400]: 3.5155 images/sec, Average discrim_real: -0.0086 discrim_fake: -0.3467 gen_err -0.3466 rec_err 9.0209
+Level 2/2 epoch [62/80] iteration[201/400]: 3.5155 images/sec, Average discrim_real: -0.0092 discrim_fake: -0.3468 gen_err -0.3466 rec_err 9.0297
+Level 2/2 epoch [63/80] iteration[101/400]: 3.5155 images/sec, Average discrim_real: -0.0093 discrim_fake: -0.3471 gen_err -0.3473 rec_err 9.0337
+Level 2/2 epoch [64/80] iteration[1/400]: 3.5155 images/sec, Average discrim_real: -0.0094 discrim_fake: -0.3445 gen_err -0.3454 rec_err 9.0207
+Level 2/2 epoch [64/80] iteration[301/400]: 3.5155 images/sec, Average discrim_real: -0.0094 discrim_fake: -0.3460 gen_err -0.3460 rec_err 9.0229
+Level 2/2 epoch [65/80] iteration[201/400]: 3.5155 images/sec, Average discrim_real: -0.0092 discrim_fake: -0.3463 gen_err -0.3465 rec_err 9.0178
+Level 2/2 epoch [66/80] iteration[101/400]: 3.5155 images/sec, Average discrim_real: -0.0095 discrim_fake: -0.3471 gen_err -0.3472 rec_err 9.0243
+Level 2/2 epoch [67/80] iteration[1/400]: 3.5155 images/sec, Average discrim_real: -0.0095 discrim_fake: -0.3439 gen_err -0.3440 rec_err 9.0122
+Level 2/2 epoch [67/80] iteration[301/400]: 3.5154 images/sec, Average discrim_real: -0.0094 discrim_fake: -0.3462 gen_err -0.3463 rec_err 9.0291
+Level 2/2 epoch [68/80] iteration[201/400]: 3.5154 images/sec, Average discrim_real: -0.0095 discrim_fake: -0.3465 gen_err -0.3462 rec_err 9.0030
+Level 2/2 epoch [69/80] iteration[101/400]: 3.5154 images/sec, Average discrim_real: -0.0090 discrim_fake: -0.3461 gen_err -0.3460 rec_err 9.0058
+Level 2/2 epoch [70/80] iteration[1/400]: 3.5154 images/sec, Average discrim_real: -0.0097 discrim_fake: -0.3456 gen_err -0.3459 rec_err 9.0197
+Level 2/2 epoch [70/80] iteration[301/400]: 3.5154 images/sec, Average discrim_real: -0.0097 discrim_fake: -0.3469 gen_err -0.3470 rec_err 9.0376
+Level 2/2 epoch [71/80] iteration[201/400]: 3.5154 images/sec, Average discrim_real: -0.0097 discrim_fake: -0.3469 gen_err -0.3470 rec_err 9.0178
+Level 2/2 epoch [72/80] iteration[101/400]: 3.5152 images/sec, Average discrim_real: -0.0094 discrim_fake: -0.3468 gen_err -0.3468 rec_err 9.0174
+Level 2/2 epoch [73/80] iteration[1/400]: 3.5152 images/sec, Average discrim_real: -0.0098 discrim_fake: -0.3471 gen_err -0.3472 rec_err 9.0282
+Level 2/2 epoch [73/80] iteration[301/400]: 3.5151 images/sec, Average discrim_real: -0.0098 discrim_fake: -0.3468 gen_err -0.3468 rec_err 9.0261
+Level 2/2 epoch [74/80] iteration[201/400]: 3.5151 images/sec, Average discrim_real: -0.0098 discrim_fake: -0.3467 gen_err -0.3468 rec_err 9.0117
+Level 2/2 epoch [75/80] iteration[101/400]: 3.5151 images/sec, Average discrim_real: -0.0098 discrim_fake: -0.3471 gen_err -0.3471 rec_err 9.0313
+Level 2/2 epoch [76/80] iteration[1/400]: 3.5151 images/sec, Average discrim_real: -0.0098 discrim_fake: -0.3470 gen_err -0.3470 rec_err 9.0285
+Level 2/2 epoch [76/80] iteration[301/400]: 3.5151 images/sec, Average discrim_real: -0.0099 discrim_fake: -0.3470 gen_err -0.3472 rec_err 9.0260
+Level 2/2 epoch [77/80] iteration[201/400]: 3.5150 images/sec, Average discrim_real: -0.0100 discrim_fake: -0.3470 gen_err -0.3470 rec_err 9.0337
+Level 2/2 epoch [78/80] iteration[101/400]: 3.5150 images/sec, Average discrim_real: -0.0100 discrim_fake: -0.3465 gen_err -0.3465 rec_err 9.0272
+Level 2/2 epoch [79/80] iteration[1/400]: 3.5150 images/sec, Average discrim_real: -0.0096 discrim_fake: -0.3452 gen_err -0.3451 rec_err 8.9995
+Level 2/2 epoch [79/80] iteration[301/400]: 3.5149 images/sec, Average discrim_real: -0.0097 discrim_fake: -0.3468 gen_err -0.3468 rec_err 9.0019
+Level 2/2 epoch [80/80] iteration[201/400]: 3.5148 images/sec, Average discrim_real: -0.0100 discrim_fake: -0.3467 gen_err -0.3467 rec_err 9.0210
+2020-08-06 03:51:43.121283 - Finished training in scale 1 in 151.794528 minutes
+2020-08-06 03:51:43.122283 - Finished training  in 289.864195 minutes
+Saving model to SavedModels\Temp

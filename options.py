@@ -7,6 +7,7 @@ class Options():
         # Input info
         opt["mode"]                    = "2D"      # What SinGAN to use - 2D or 3D
         opt["data_folder"]             = "CM1_2/train"
+        opt["validation_folder"]       = "CM1_2/validation"
         opt["num_training_examples"]   = None
         opt["save_folder"]             = "SavedModels"
         opt["save_name"]               = "Temp"    # Folder that the model will be saved to

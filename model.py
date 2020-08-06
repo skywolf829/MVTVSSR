@@ -260,6 +260,30 @@ def save_training_graph(losses, scale_num, opt):
     plt.close()
     return fig, ax
 
+def validation_PSNRs(generators, generator, opt):
+    dataset = Dataset(os.path.join(input_folder, opt["validation_folder"]))
+    psnrs = []
+    with torch.no_grad():
+        for i in range(len(dataset)):
+            test_frame = dataset.__getitem__(i)
+            y = test_frame.clone().cuda().unsqueeze(0)
+            
+            # Create the low res version of it
+            lr = F.interpolate(y.clone(), size=opt["scales"][0], mode=opt["downsample_mode"], align_corners=True)
+            
+            # Create network reconstructed result
+            x = F.interpolate(y.clone(), size=opt["scales"][0], mode=opt["downsample_mode"], align_corners=True)
+            x = F.interpolate(x, size=opt["scales"][1], mode=opt["upsample_mode"], align_corners=True)
+            if(len(generators) > 0):
+                x = generate(generators, opt, 1, "reconstruct", x, opt["device"][0]).detach()
+                x = F.interpolate(x, size=opt["scales"][len(generators)+1], mode=opt["upsample_mode"], align_corners=True)
+            x = generator(x, torch.zeros(x.shape, device=opt["device"][0]),opt["mode"])
+            x = x.clamp(min=-1, max=1)
+            y_lr = F.interpolate(y.clone(), size=opt["scales"][len(generators)+1], mode=opt["downsample_mode"], align_corners=True)
+            p = psnr(x+1, y_lr+1, data_range=2., reduction="none").item()
+            psnrs.append(p)
+    return (np.array(psnrs)).mean()
+
 def train_single_scale(process_num, generators, discriminators_s, discriminators_t, opt):
     # Distributed - torch will call this with a different process_num (0, ... N-1)
     # Set up distributed environment
@@ -307,9 +331,6 @@ def train_single_scale(process_num, generators, discriminators_s, discriminators
 
     losses = [[],[],[],[]]
     torch.manual_seed(0)
-    
-    print_to_log_and_console("Process num %i training on GPU %i" % (process_num, gpu_id), 
-    os.path.join(opt["save_folder"], opt["save_name"]), "log.txt")
 
     # Move all models to this GPU and make them distributed
     for i in range(len(generators)):
@@ -330,6 +351,8 @@ def train_single_scale(process_num, generators, discriminators_s, discriminators
         discriminator_t = nn.parallel.DistributedDataParallel(discriminator_t, device_ids=[gpu_id], find_unused_parameters=True)
 
     if(process_num == 0):
+        print_to_log_and_console("Process num %i training on GPU %i" % (process_num, gpu_id), 
+            os.path.join(opt["save_folder"], opt["save_name"]), "log.txt")
         print_to_log_and_console("Kernels this scale: %i" % num_kernels_this_scale, 
             os.path.join(opt["save_folder"], opt["save_name"]), "log.txt")
     num_kernels_factor = num_kernels_this_scale / opt["base_num_kernels"]
@@ -355,8 +378,9 @@ def train_single_scale(process_num, generators, discriminators_s, discriminators
     #discriminator_s_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer=discriminator_s_optimizer,milestones=[1600],gamma=opt["gamma"])
     #discriminator_t_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer=discriminator_t_optimizer,milestones=[1600],gamma=opt["gamma"])
     
-    writer = SummaryWriter(os.path.join(opt["save_folder"], 'tensorboard', 
-    "%ikernels_%ilayers_%iminibatch_%iepochs_%.02fdownscaleratio" % (opt["base_num_kernels"], opt["num_blocks"], opt["minibatch"], opt["epochs"], opt["downscale_ratio"])))
+    if(process_num == 0):
+        writer = SummaryWriter(os.path.join('tensorboard', 'training',
+        "%ikernels_%ilayers_%iminibatch_%iepochs_%.02fdownscaleratio" % (opt["base_num_kernels"], opt["num_blocks"], opt["minibatch"], opt["epochs"], opt["downscale_ratio"])))
 
     start_time = time.time()
     next_save = 0
@@ -446,7 +470,7 @@ def train_single_scale(process_num, generators, discriminators_s, discriminators
                 reconstructed_frames = generator(reconstructed_frames.detach(), torch.zeros(reconstructed_frames.shape, device=opt["device"][0]),opt["mode"])
                 
                 
-                rec_loss = opt["alpha"]*torch.sqrt(loss(reconstructed_frames, output_dataframes_this_scale) + 0.00001)
+                rec_loss = opt["alpha"]*loss(reconstructed_frames, output_dataframes_this_scale)
                 rec_loss.backward(retain_graph=True)
                 losses[3].append(rec_loss.detach().item())
                 generator_optimizer.step()
@@ -461,13 +485,7 @@ def train_single_scale(process_num, generators, discriminators_s, discriminators
 
             
            
-            if images_seen > next_save:
-                fig, ax = save_training_graph(losses, len(generators), opt)
-                writer.add_scalar('Discrim_real_loss_%i' % len(generators), avg_discrim_real, images_seen)
-                writer.add_scalar('Discrim_fake_loss_%i' % len(generators), avg_discrim_fake, images_seen)
-                writer.add_scalar('Gen_loss_%i' % len(generators), avg_gen_fake, images_seen)
-                writer.add_scalar('Rec_loss_%i' % len(generators), avg_rec, images_seen)
-                next_save += 300
+            if process_num == 0 and images_seen > next_save:
                 print_to_log_and_console("Level %i/%i epoch [%i/%i] iteration[%i/%i]: %.04f images/sec, Average discrim_real: %.04f discrim_fake: %.04f gen_err %.04f rec_err %.04f" % 
                     (len(generators)+1, opt["n"]-1, 
                     epoch+1, opt["epochs"], 
@@ -477,21 +495,33 @@ def train_single_scale(process_num, generators, discriminators_s, discriminators
                     avg_gen_fake, avg_rec), 
                     os.path.join(opt["save_folder"], opt["save_name"]), "log.txt")
 
+                fig, ax = save_training_graph(losses, len(generators), opt)
+                validation_avg_psnr = validation_PSNRs(generators, generator, opt)
+                writer.add_scalar('Discrim_real_loss_%i' % len(generators), avg_discrim_real, images_seen)
+                writer.add_scalar('Discrim_fake_loss_%i' % len(generators), avg_discrim_fake, images_seen)
+                writer.add_scalar('Gen_loss_%i' % len(generators), avg_gen_fake, images_seen)
+                writer.add_scalar('Rec_loss_%i' % len(generators), avg_rec, images_seen)
+                writer.add_scalar('Validation_PSNR_%i' % len(generators), validation_avg_psnr, images_seen)
+                next_save += 300
+                
+
         #discriminator_s_scheduler.step()
         #generator_scheduler.step()
+    if process_num == 0:
+        fig, ax = save_training_graph(losses, len(generators), opt)
+        validation_avg_psnr = validation_PSNRs(generators, generator, opt)
+        writer.add_scalar('Discrim_real_loss_%i' % len(generators), avg_discrim_real, images_seen)
+        writer.add_scalar('Discrim_fake_loss_%i' % len(generators), avg_discrim_fake, images_seen)
+        writer.add_scalar('Gen_loss_%i' % len(generators), avg_gen_fake, images_seen)
+        writer.add_scalar('Rec_loss_%i' % len(generators), avg_rec, images_seen)
+        writer.add_scalar('Validation_PSNR_%i' % len(generators), validation_avg_psnr, images_seen)
+        writer.flush()
+        writer.close()
 
-    fig, ax = save_training_graph(losses, len(generators), opt)
-    writer.add_scalar('Discrim_real_loss_%i' % len(generators), avg_discrim_real, images_seen)
-    writer.add_scalar('Discrim_fake_loss_%i' % len(generators), avg_discrim_fake, images_seen)
-    writer.add_scalar('Gen_loss_%i' % len(generators), avg_gen_fake, images_seen)
-    writer.add_scalar('Rec_loss_%i' % len(generators), avg_rec, images_seen)
-    writer.flush()
     generator = reset_grads(generator, False)
     generator.eval()
     discriminator_s = reset_grads(discriminator_s, False)
     discriminator_s.eval()
-
-    writer.close()
 
     if(process_num == 0 and opt["train_distributed"]):
         generators.append(generator)
@@ -520,15 +550,15 @@ class MVTVSSR_Generator(nn.Module):
             batchnorm_layer = nn.BatchNorm3d
             self.padder = nn.ZeroPad3d(required_padding)
 
-        self.model.append(conv_layer(num_channels, num_kernels, kernel_size=kernel_size, stride=stride, padding=layer_padding))
-        #self.model.append(batchnorm_layer(num_kernels))
+        self.model.append(conv_layer(num_channels, num_kernels*num_channels, kernel_size=kernel_size, stride=stride, padding=layer_padding, groups=num_channels))
+        #self.model.append(batchnorm_layer(num_kernels*num_channels))
         self.model.append(nn.LeakyReLU(0.2, inplace=True))
         for i in range(num_blocks):
-            self.model.append(conv_layer(num_kernels, num_kernels, kernel_size=kernel_size, stride=stride, padding=layer_padding))
-            #self.model.append(batchnorm_layer(num_kernels))
+            self.model.append(conv_layer(num_kernels*num_channels, num_kernels*num_channels, kernel_size=kernel_size, stride=stride, padding=layer_padding, groups=num_channels))
+            #self.model.append(batchnorm_layer(num_kernels*num_channels))
             self.model.append(nn.LeakyReLU(0.2, inplace=True))
 
-        self.model.append(conv_layer(num_kernels, num_channels, kernel_size=kernel_size, stride=stride, padding=layer_padding))
+        self.model.append(conv_layer(num_kernels*num_channels, num_channels, kernel_size=kernel_size, stride=stride, padding=layer_padding, groups=num_channels))
         self.model.append(nn.Tanh())
 
         self.model = nn.Sequential(*self.model)
@@ -558,35 +588,35 @@ class MVTVSSR_Spatial_Discriminator(nn.Module):
         if(use_spectral_norm):
             self.model.append(
                 nn.Sequential(
-                    SpectralNorm(conv_layer(num_channels, num_kernels, kernel_size=kernel_size, stride=stride, padding=layer_padding)),
-                    SpectralNorm(batchnorm_layer(num_kernels)),
+                    SpectralNorm(conv_layer(num_channels, num_kernels*num_channels, kernel_size=kernel_size, stride=stride, padding=layer_padding, groups=num_channels)),
+                    SpectralNorm(batchnorm_layer(num_kernels*num_channels)),
                     nn.LeakyReLU(0.2, inplace=True)
                 )
             )
             for i in range(num_blocks):
                 self.model.append(nn.Sequential(
-                    SpectralNorm(conv_layer(num_kernels, num_kernels, kernel_size=kernel_size, stride=stride, padding=layer_padding)),
-                    SpectralNorm(batchnorm_layer(num_kernels)),
+                    SpectralNorm(conv_layer(num_kernels*num_channels, num_kernels*num_channels, kernel_size=kernel_size, stride=stride, padding=layer_padding, groups=num_channels)),
+                    SpectralNorm(batchnorm_layer(num_kernels*num_channels)),
                     nn.LeakyReLU(0.2, inplace=True)
                 ))
-            self.model.append(SpectralNorm(conv_layer(num_kernels, num_channels, kernel_size=kernel_size, stride=stride, padding=layer_padding)))
+            self.model.append(SpectralNorm(conv_layer(num_kernels*num_channels, num_kernels*num_channels, kernel_size=kernel_size, stride=stride, padding=layer_padding, groups=num_channels)))
         else:
             self.model.append(
                 nn.Sequential(
-                    conv_layer(num_channels, num_kernels, kernel_size=kernel_size, stride=stride, padding=layer_padding),
-                    batchnorm_layer(num_kernels),
+                    conv_layer(num_channels, num_kernels*num_channels, kernel_size=kernel_size, stride=stride, padding=layer_padding),
+                    batchnorm_layer(num_kernels*num_channels),
                     nn.LeakyReLU(0.2, inplace=True)
                 )
             )
 
             for i in range(num_blocks):
                 self.model.append(nn.Sequential(
-                    conv_layer(num_kernels, num_kernels, kernel_size=kernel_size, stride=stride, padding=layer_padding),
-                    batchnorm_layer(num_kernels),
+                    conv_layer(num_kernels*num_channels, num_kernels*num_channels, kernel_size=kernel_size, stride=stride, padding=layer_padding, groups=num_channels),
+                    batchnorm_layer(num_kernels*num_channels),
                     nn.LeakyReLU(0.2, inplace=True)
                 ))
 
-            self.model.append(conv_layer(num_kernels, num_channels, kernel_size=kernel_size, stride=stride, padding=layer_padding))
+            self.model.append(conv_layer(num_kernels*num_channels, num_kernels*num_channels, kernel_size=kernel_size, stride=stride, padding=layer_padding, groups=num_channels))
 
         self.model = nn.Sequential(*self.model)
 

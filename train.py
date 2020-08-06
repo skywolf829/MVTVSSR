@@ -16,6 +16,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--mode',default=None,help='The type of input - 2D, 3D, or 2D time-varying')
     parser.add_argument('--data_folder',default=None,type=str,help='File to train on')
+    parser.add_argument('--validation_folder',default=None,type=str,help='File to validate on')
     parser.add_argument('--num_training_examples',default=None,type=int,help='Frames to use from training file')
     parser.add_argument('--save_folder',default=None, help='The folder to save the models folder into')
     parser.add_argument('--save_name',default=None, help='The name for the folder to save the model')
@@ -126,6 +127,8 @@ if __name__ == '__main__':
     print_to_log_and_console("%s - Finished training  in %f minutes" % (str(datetime.datetime.now()), time_passed),
     os.path.join(opt["save_folder"], opt["save_name"]), "log.txt") 
     save_models(generators, discriminators_s, discriminators_t, opt)
+
+    #os.system("test.py --load_from %s --device %s" % (args["save_name"], "cuda:"+str(opt['device'][0])))
 
 
 
