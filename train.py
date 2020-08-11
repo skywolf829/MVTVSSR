@@ -14,7 +14,7 @@ import datetime
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Train on an input that is 2D')
 
-    parser.add_argument('--mode',default=None,help='The type of input - 2D, 3D, or 2D time-varying')
+    parser.add_argument('--mode',default=None,help='The type of input - 2D, 3D')
     parser.add_argument('--data_folder',default=None,type=str,help='File to train on')
     parser.add_argument('--validation_folder',default=None,type=str,help='File to validate on')
     parser.add_argument('--num_training_examples',default=None,type=int,help='Frames to use from training file')
@@ -26,6 +26,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--num_blocks',default=None,type=int, help='Num of conv-batchnorm-relu blocks per gen/discrim')
     parser.add_argument('--base_num_kernels',default=None,type=int, help='Num conv kernels in lowest layer')
+    parser.add_argument('--conv_groups',default=None,type=int, help='Num of groups to use in conv layers')
     parser.add_argument('--conv_layer_padding',default=None, type=int,help='Padding for each conv layer')
     parser.add_argument('--network_input_padding',default=None,type=int, help='Padding before entering network')
     parser.add_argument('--kernel_size',default=None, type=int,help='Conv kernel size')

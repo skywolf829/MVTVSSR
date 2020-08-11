@@ -10,6 +10,28 @@ import argparse
 from typing import Union, Tuple
 from matplotlib.pyplot import cm
 import matplotlib.pyplot as plt
+from math import log, e
+
+def data_to_bin_probability(data, num_bins):
+    probs = []
+    data = data.clone().flatten()
+    d_min = -1
+    d_max = 1
+    for i in range(num_bins):
+        bin_min = d_min + i * ((d_max-d_min) / num_bins)
+        bin_max = d_min + (i+1) * ((d_max-d_min) / num_bins)
+        if(i == num_bins - 1):            
+            indices = torch.where((data >= bin_min) & (data <= bin_max))
+        else:
+            indices = torch.where((data >= bin_min) & (data < bin_max))
+        probs.append(indices[0].shape[0] / data.shape[0])
+    return probs
+
+def calculate_entropy(probs):
+    ent = 0.
+    for i in range(len(probs)):
+        ent -= probs[i] * log(probs[i] + 1e-8, e)
+    return ent
 
 
 MVTVSSR_folder_path = os.path.dirname(os.path.abspath(__file__))
@@ -27,48 +49,27 @@ parser.add_argument('--visualize',default=None,type=int,help='channel to visuali
 
 args = vars(parser.parse_args())
 
-opt = load_options(os.path.join(save_folder, args["load_from"]))
-opt["device"] = [args["device"]]
-opt["save_name"] = args["load_from"]
-
-if(args["num_testing_examples"] is None):
-    args["num_testing_examples"] = len(os.listdir(os.path.join(input_folder, args["data_folder"])))
-dataset = Dataset(os.path.join(input_folder, args["data_folder"]))
 torch.cuda.set_device(args["device"])
 
-psnrs_bilin0 = []
-psnrs_bilin1 = []
+entropys = []
+dataset = Dataset(os.path.join(input_folder, args["data_folder"]))
 
-writer = SummaryWriter(os.path.join('tensorboard', 'validation', 'bilinear'))
+channel = 3
 
-for i in range(args["num_testing_examples"]):
-    # Get the data
-    test_frame = dataset.__getitem__(i).clone()
-    y1 = test_frame.clone().cuda().unsqueeze(0)
-
-    # Create the low res versions of it
-    lr = F.interpolate(y1.clone(), size=opt["scales"][0], mode=opt["downsample_mode"], align_corners=True)
-    y0 = F.interpolate(y1.clone(), size=opt["scales"][1], mode=opt["downsample_mode"], align_corners=True)
-    
-    # Create bilinear upsampling result
-    bilin0 = F.interpolate(lr.clone(), size=opt["scales"][1], mode=opt["upsample_mode"], align_corners=True)
-    bilin1 = F.interpolate(lr.clone(), size=opt["scales"][2], mode=opt["upsample_mode"], align_corners=True)
-
-    # Get metrics for the frame
-    y0 = y0 + 1
-    y1 = y1 + 1
-    bilin0 = bilin0 + 1
-    bilin1 = bilin1 + 1
-
-    p_bilin0 = psnr(bilin0.clone(), y0.clone(), data_range=2., reduction="none").item()
-    p_bilin1 = psnr(bilin1.clone(), y1.clone(), data_range=2., reduction="none").item()
-
-    psnrs_bilin0.append(p_bilin0)
-    psnrs_bilin1.append(p_bilin1)
-
-psnrs_bilin0 = np.array(psnrs_bilin0)
-psnrs_bilin1 = np.array(psnrs_bilin1)
-
-for i in range(80*400):    
-    writer.add_scalar('Validation_PSNR_0', psnrs_bilin0.mean(), i)
-    writer.add_scalar('Validation_PSNR_1', psnrs_bilin1.mean(), i)
+for s in range(15):
+    scale = 1.0 - s * 0.05
+    ents = []
+    for i in range(len(dataset)):
+        # Get the data
+        test_frame = dataset.__getitem__(i).clone().unsqueeze(0).cuda()
+        shape = list(test_frame.shape[2:])
+        shape[0] = int(shape[0] * scale)
+        shape[1] = int(shape[1] * scale)
+        if(s is not 0):
+            test_frame = F.interpolate(test_frame, size=shape, mode='bilinear', align_corners=True)
+        probs = data_to_bin_probability(test_frame[0,channel], 100)
+        #print(probs)
+        ent = calculate_entropy(probs)
+        #print(ent)
+        ents.append(ent)
+    print((np.array(ents)).mean())

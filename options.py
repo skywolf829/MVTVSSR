@@ -19,6 +19,7 @@ class Options():
         # GAN info
         opt["num_blocks"]              = 3
         opt["base_num_kernels"]        = 32        # Num of kernels in smallest scale conv layers
+        opt["conv_groups"]             = 1
         opt["conv_layer_padding"]      = 0         # Padding on conv layers in the GAN
         opt["network_input_padding"]   = 5         # Padding to do to input to GAN (ideally half the receptive field)
         opt["kernel_size"]             = 3
@@ -30,7 +31,7 @@ class Options():
         opt["scales"]                  = []        # The scales for the GAN
         opt["base_resolution"]         = [128, 128]# Base resolution for full scale images [rows, cols] aka [y, x] aka [height, width]
         opt["use_spectral_norm"]       = True
-        opt["downsample_mode"]         = "bilinear"
+        opt["downsample_mode"]         = "nearest"
         opt["upsample_mode"]           = "bilinear"
 
         opt["train_distributed"]       = False

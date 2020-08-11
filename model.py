@@ -90,7 +90,7 @@ def init_gen(scale, opt):
 
     generator = MVTVSSR_Generator(opt["scales"][scale], opt["num_blocks"], opt["num_channels"],
     num_kernels, opt["kernel_size"], opt["stride"], 
-    opt["conv_layer_padding"], opt["network_input_padding"], opt["mode"])
+    opt["conv_layer_padding"], opt["network_input_padding"], opt['conv_groups'], opt["mode"])
     weights_init(generator)
     return generator, num_kernels
 
@@ -100,7 +100,7 @@ def init_discrim_s(scale, opt):
 
     discriminator = MVTVSSR_Spatial_Discriminator(opt["scales"][scale], opt["num_blocks"], opt["num_channels"],
     num_kernels, opt["kernel_size"], opt["stride"], 
-    opt["conv_layer_padding"], opt["use_spectral_norm"], opt["mode"])
+    opt["conv_layer_padding"], opt["use_spectral_norm"], opt['conv_groups'], opt["mode"])
     weights_init(discriminator)
     return discriminator
 
@@ -533,7 +533,7 @@ def train_single_scale(process_num, generators, discriminators_s, discriminators
 
 class MVTVSSR_Generator(nn.Module):
     def __init__ (self, resolution, num_blocks, num_channels, num_kernels, kernel_size, 
-    stride, layer_padding, pre_padding, mode):
+    stride, layer_padding, pre_padding, groups, mode):
         super(MVTVSSR_Generator, self).__init__()
         self.resolution = resolution
         self.model = []
@@ -550,15 +550,15 @@ class MVTVSSR_Generator(nn.Module):
             batchnorm_layer = nn.BatchNorm3d
             self.padder = nn.ZeroPad3d(required_padding)
 
-        self.model.append(conv_layer(num_channels, num_kernels*num_channels, kernel_size=kernel_size, stride=stride, padding=layer_padding, groups=num_channels))
+        self.model.append(conv_layer(num_channels, num_kernels*num_channels, kernel_size=kernel_size, stride=stride, padding=layer_padding, groups=groups))
         #self.model.append(batchnorm_layer(num_kernels*num_channels))
         self.model.append(nn.LeakyReLU(0.2, inplace=True))
         for i in range(num_blocks):
-            self.model.append(conv_layer(num_kernels*num_channels, num_kernels*num_channels, kernel_size=kernel_size, stride=stride, padding=layer_padding, groups=num_channels))
+            self.model.append(conv_layer(num_kernels*num_channels, num_kernels*num_channels, kernel_size=kernel_size, stride=stride, padding=layer_padding, groups=groups))
             #self.model.append(batchnorm_layer(num_kernels*num_channels))
             self.model.append(nn.LeakyReLU(0.2, inplace=True))
 
-        self.model.append(conv_layer(num_kernels*num_channels, num_channels, kernel_size=kernel_size, stride=stride, padding=layer_padding, groups=num_channels))
+        self.model.append(conv_layer(num_kernels*num_channels, num_channels, kernel_size=kernel_size, stride=stride, padding=layer_padding, groups=groups))
         self.model.append(nn.Tanh())
 
         self.model = nn.Sequential(*self.model)
@@ -572,7 +572,7 @@ class MVTVSSR_Generator(nn.Module):
 
 class MVTVSSR_Spatial_Discriminator(nn.Module):
     def __init__ (self, resolution, num_blocks, num_channels, num_kernels, kernel_size, 
-    stride, layer_padding, use_spectral_norm, mode):
+    stride, layer_padding, use_spectral_norm, groups, mode):
         super(MVTVSSR_Spatial_Discriminator, self).__init__()
 
         if(mode == "2D"):
@@ -588,18 +588,18 @@ class MVTVSSR_Spatial_Discriminator(nn.Module):
         if(use_spectral_norm):
             self.model.append(
                 nn.Sequential(
-                    SpectralNorm(conv_layer(num_channels, num_kernels*num_channels, kernel_size=kernel_size, stride=stride, padding=layer_padding, groups=num_channels)),
+                    SpectralNorm(conv_layer(num_channels, num_kernels*num_channels, kernel_size=kernel_size, stride=stride, padding=layer_padding, groups=groups)),
                     SpectralNorm(batchnorm_layer(num_kernels*num_channels)),
                     nn.LeakyReLU(0.2, inplace=True)
                 )
             )
             for i in range(num_blocks):
                 self.model.append(nn.Sequential(
-                    SpectralNorm(conv_layer(num_kernels*num_channels, num_kernels*num_channels, kernel_size=kernel_size, stride=stride, padding=layer_padding, groups=num_channels)),
+                    SpectralNorm(conv_layer(num_kernels*num_channels, num_kernels*num_channels, kernel_size=kernel_size, stride=stride, padding=layer_padding, groups=groups)),
                     SpectralNorm(batchnorm_layer(num_kernels*num_channels)),
                     nn.LeakyReLU(0.2, inplace=True)
                 ))
-            self.model.append(SpectralNorm(conv_layer(num_kernels*num_channels, num_kernels*num_channels, kernel_size=kernel_size, stride=stride, padding=layer_padding, groups=num_channels)))
+            self.model.append(SpectralNorm(conv_layer(num_kernels*num_channels, num_kernels*num_channels, kernel_size=kernel_size, stride=stride, padding=layer_padding, groups=groups)))
         else:
             self.model.append(
                 nn.Sequential(
