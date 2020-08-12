@@ -59,34 +59,40 @@ def reset_grads(model,require_grad):
 def l2normalize(v, eps=1e-12):
     return v / (v.norm() + eps)
 
-def generate_padded_noise(size, pad_size, pad_with_noise, device):
+def generate_padded_noise(size, pad_size, pad_with_noise, mode, device):
     if(pad_with_noise):
         for i in range(2,len(size)):
             size[i] += 2*pad_size
         noise = torch.randn(size, device=device)
     else:
         noise = torch.randn(size, device=device)
-        pad_zero = nn.ZeroPad2d(pad_size)
-        noise = pad_zero(noise)
+        if mode == "2D":
+            required_padding = [pad_size, pad_size, pad_size, pad_size]
+        else:
+            required_padding = [pad_size, pad_size, pad_size, pad_size, pad_size, pad_size]
+        noise = F.pad(noise, required_padding)
     return noise
 
 def init_scales(opt):
     ns = []
-    if(opt["downscale_ratio"] < 1.0):
-        ns.append(round(math.log(opt["min_dimension_size"] / opt["base_resolution"][0]) / math.log(opt["downscale_ratio"])) + 1)
-        ns.append(round(math.log(opt["min_dimension_size"] / opt["base_resolution"][1]) / math.log(opt["downscale_ratio"])) + 1)
+    if(opt["spatial_downscale_ratio"] < 1.0):
+        for i in range(len(opt["base_resolution"])):            
+            ns.append(round(math.log(opt["min_dimension_size"] / opt["base_resolution"][i]) / math.log(opt["spatial_downscale_ratio"])) + 1)
+
     opt["n"] = min(ns)
     print("The model will have %i scales" % (opt["n"]))
     for i in range(opt["n"]):
-        x = round(opt["base_resolution"][1] * (opt["downscale_ratio"] ** i))
-        y = round(opt["base_resolution"][0] * (opt["downscale_ratio"] ** i))
-        scaling = [y, x]
+        scaling = []
+        for j in range(len(opt["base_resolution"])):            
+            x = round(opt["base_resolution"][j] * (opt["spatial_downscale_ratio"] ** i))
+            scaling.append(x)
         opt["scales"].insert(0, scaling)
         print("Scale %i: %s" % (opt["n"] - 1 - i, str(scaling)))
 
 def init_gen(scale, opt):
     num_kernels_exp = math.log(opt["base_num_kernels"]) / math.log(2)
-    num_kernels = int(math.pow(2, num_kernels_exp + ((scale-1) / 4)))
+    #num_kernels = int(math.pow(2, num_kernels_exp + ((scale-1) / 4)))
+    num_kernels = opt["base_num_kernels"]
 
     generator = MVTVSSR_Generator(opt["scales"][scale], opt["num_blocks"], opt["num_channels"],
     num_kernels, opt["kernel_size"], opt["stride"], 
@@ -96,7 +102,8 @@ def init_gen(scale, opt):
 
 def init_discrim_s(scale, opt):
     num_kernels_exp = math.log(opt["base_num_kernels"]) / math.log(2)
-    num_kernels = int(math.pow(2, num_kernels_exp + ((scale-1) / 4)))
+    #num_kernels = int(math.pow(2, num_kernels_exp + ((scale-1) / 4)))
+    num_kernels = opt["base_num_kernels"]
 
     discriminator = MVTVSSR_Spatial_Discriminator(opt["scales"][scale], opt["num_blocks"], opt["num_channels"],
     num_kernels, opt["kernel_size"], opt["stride"], 
@@ -128,7 +135,7 @@ def generate(generators, opt, minibatch, mode, starting_frames, device):
         generated_image = generator(generated_image, noise, opt["mode"])
         if(i < len(generators) - 1):
             generated_image = F.interpolate(generated_image, 
-            size=opt["scales"][i+2], mode=opt["upsample_mode"], align_corners=True)
+            size=opt["scales"][i+2], mode=opt["upsample_mode"])
     return generated_image
 
 def save_models(generators, discriminators_s, discriminators_t, opt):
@@ -269,18 +276,19 @@ def validation_PSNRs(generators, generator, opt):
             y = test_frame.clone().cuda().unsqueeze(0)
             
             # Create the low res version of it
-            lr = F.interpolate(y.clone(), size=opt["scales"][0], mode=opt["downsample_mode"], align_corners=True)
+            lr = F.interpolate(y.clone(), size=opt["scales"][0], mode=opt["downsample_mode"])
             
             # Create network reconstructed result
-            x = F.interpolate(y.clone(), size=opt["scales"][0], mode=opt["downsample_mode"], align_corners=True)
-            x = F.interpolate(x, size=opt["scales"][1], mode=opt["upsample_mode"], align_corners=True)
+            x = F.interpolate(y.clone(), size=opt["scales"][0], mode=opt["downsample_mode"])
+            x = F.interpolate(x, size=opt["scales"][1], mode=opt["upsample_mode"])
             if(len(generators) > 0):
                 x = generate(generators, opt, 1, "reconstruct", x, opt["device"][0]).detach()
-                x = F.interpolate(x, size=opt["scales"][len(generators)+1], mode=opt["upsample_mode"], align_corners=True)
+                x = F.interpolate(x, size=opt["scales"][len(generators)+1], mode=opt["upsample_mode"])
             x = generator(x, torch.zeros(x.shape, device=opt["device"][0]),opt["mode"])
             x = x.clamp(min=-1, max=1)
-            y_lr = F.interpolate(y.clone(), size=opt["scales"][len(generators)+1], mode=opt["downsample_mode"], align_corners=True)
-            p = psnr(x+1, y_lr+1, data_range=2., reduction="none").item()
+            y_lr = F.interpolate(y.clone(), size=opt["scales"][len(generators)+1], mode=opt["downsample_mode"])
+
+            p = 20*math.log(2) - 10*math.log(torch.mean((x - y_lr)**2).item())
             psnrs.append(p)
     return (np.array(psnrs)).mean()
 
@@ -380,7 +388,7 @@ def train_single_scale(process_num, generators, discriminators_s, discriminators
     
     if(process_num == 0):
         writer = SummaryWriter(os.path.join('tensorboard', 'training',
-        "%ikernels_%ilayers_%iminibatch_%iepochs_%.02fdownscaleratio" % (opt["base_num_kernels"], opt["num_blocks"], opt["minibatch"], opt["epochs"], opt["downscale_ratio"])))
+        "%ikernels_%ilayers_%iminibatch_%iepochs_%.02fdownscaleratio" % (opt["base_num_kernels"], opt["num_blocks"], opt["minibatch"], opt["epochs"], opt["spatial_downscale_ratio"])))
 
     start_time = time.time()
     next_save = 0
@@ -392,38 +400,38 @@ def train_single_scale(process_num, generators, discriminators_s, discriminators
             minibatch_size = output_dataframes.shape[0]
             output_dataframes = output_dataframes.cuda(non_blocking=True)
             if(len(generators)+2 < len(opt["scales"])):
-                output_dataframes_this_scale = F.interpolate(output_dataframes.clone(), size=opt["scales"][len(generators)+1], mode=opt["downsample_mode"], align_corners=True)
+                output_dataframes_this_scale = F.interpolate(output_dataframes.clone(), size=opt["scales"][len(generators)+1], mode=opt["downsample_mode"])
             else:
                 output_dataframes_this_scale = output_dataframes.clone()
-            
+
             # Calculate the noise amplitude needed at this level            
             if(epoch == 0 and i == 0):
                 criterion = nn.MSELoss().cuda()
-                lowest_res = F.interpolate(output_dataframes.clone(), size=opt["scales"][0], mode=opt["downsample_mode"], align_corners=True)
+                lowest_res = F.interpolate(output_dataframes.clone(), size=opt["scales"][0], mode=opt["downsample_mode"])
                 if(len(generators) == 0):
-                    reconstructed_frames =  F.interpolate(lowest_res, size=opt["scales"][1], mode=opt["upsample_mode"], align_corners=True)
+                    reconstructed_frames =  F.interpolate(lowest_res, size=opt["scales"][1], mode=opt["upsample_mode"])
                     noise_amp = torch.sqrt(criterion(reconstructed_frames, output_dataframes_this_scale)).item()
                 elif(len(generators) > 0):
                     reconstructed_frames = generate(generators, opt, minibatch_size, "reconstruct", lowest_res.clone(), "cuda:"+str(gpu_id))
-                    reconstructed_frames = F.interpolate(reconstructed_frames, size=opt["scales"][len(generators)+1], mode=opt["upsample_mode"], align_corners=True)
+                    reconstructed_frames = F.interpolate(reconstructed_frames, size=opt["scales"][len(generators)+1], mode=opt["upsample_mode"])
                     noise_amp = torch.sqrt(criterion(reconstructed_frames, output_dataframes_this_scale)).item()
                 opt["noise_amplitudes"].append(noise_amp)
                 
 
 
             # Downsample it to the min scale
-            downscaled_dataframes = F.interpolate(output_dataframes.clone(), size=opt["scales"][0], mode=opt["downsample_mode"], align_corners=True)
+            downscaled_dataframes = F.interpolate(output_dataframes.clone(), size=opt["scales"][0], mode=opt["downsample_mode"])
             # Upsample that to the next scale
-            generated_fake = F.interpolate(downscaled_dataframes, size=opt["scales"][1], mode=opt["upsample_mode"], align_corners=True)
+            generated_fake = F.interpolate(downscaled_dataframes, size=opt["scales"][1], mode=opt["upsample_mode"])
             
             # Send through other frozen generators
             if(len(generators) > 0):
                 generated_fake = generate(generators, opt, minibatch_size, "random", generated_fake, "cuda:"+str(gpu_id))
                 # Upscale to this scale now
-                generated_fake = F.interpolate(generated_fake, size=opt["scales"][len(generators)+1], mode=opt["upsample_mode"], align_corners=True)
+                generated_fake = F.interpolate(generated_fake, size=opt["scales"][len(generators)+1], mode=opt["upsample_mode"])
             
             # Get random noise scaled by our amplitude at this level
-            noise = opt["noise_amplitudes"][-1]*generate_padded_noise(list(generated_fake.shape), 0, False, opt["device"][0])
+            noise = opt["noise_amplitudes"][-1]*generate_padded_noise(list(generated_fake.shape), 0, False, opt["mode"], opt["device"][0])
 
             # Send input with noise through the current generator in training 
             generated_fake = generator(generated_fake, noise, opt["mode"])
@@ -461,12 +469,12 @@ def train_single_scale(process_num, generators, discriminators_s, discriminators
                 loss = nn.MSELoss().cuda(gpu_id)
                 
                 # Generate reconstructed frames for this level
-                lowest_res = F.interpolate(output_dataframes.clone(), size=opt["scales"][0], mode=opt["downsample_mode"], align_corners=True)
+                lowest_res = F.interpolate(output_dataframes.clone(), size=opt["scales"][0], mode=opt["downsample_mode"])
                 if(len(generators) == 0):
-                    reconstructed_frames =  F.interpolate(lowest_res.clone(), size=opt["scales"][1], mode=opt["upsample_mode"], align_corners=True)
+                    reconstructed_frames =  F.interpolate(lowest_res.clone(), size=opt["scales"][1], mode=opt["upsample_mode"])
                 elif(len(generators) > 0):
                     reconstructed_frames = generate(generators, opt, minibatch_size, "reconstruct", lowest_res.clone(), "cuda:"+str(gpu_id))
-                    reconstructed_frames = F.interpolate(reconstructed_frames, size=opt["scales"][len(generators)+1], mode=opt["upsample_mode"], align_corners=True)
+                    reconstructed_frames = F.interpolate(reconstructed_frames, size=opt["scales"][len(generators)+1], mode=opt["upsample_mode"])
                 reconstructed_frames = generator(reconstructed_frames.detach(), torch.zeros(reconstructed_frames.shape, device=opt["device"][0]),opt["mode"])
                 
                 
@@ -539,33 +547,38 @@ class MVTVSSR_Generator(nn.Module):
         self.model = []
 
         # Kernel_size must be odd to pad properly
-        required_padding = int(((kernel_size - 1) * (num_blocks+2)) / 2)
+        pad_amount = int(((kernel_size - 1) * (num_blocks+2)) / 2)
         
         if(mode == "2D"):
             conv_layer = nn.Conv2d
             batchnorm_layer = nn.BatchNorm2d
-            self.padder = nn.ZeroPad2d(required_padding)
+            self.required_padding = [pad_amount, pad_amount, pad_amount, pad_amount]
         elif(mode == "3D"):
-            conv_layer = nn.Conv2d
+            conv_layer = nn.Conv3d
             batchnorm_layer = nn.BatchNorm3d
-            self.padder = nn.ZeroPad3d(required_padding)
-
-        self.model.append(conv_layer(num_channels, num_kernels*num_channels, kernel_size=kernel_size, stride=stride, padding=layer_padding, groups=groups))
+            self.required_padding = [pad_amount, pad_amount, pad_amount, pad_amount, pad_amount, pad_amount]
+        rate = 0.5
+        base = math.log(num_kernels) / math.log(2)
+        p = base + rate + rate*num_blocks
+        self.model.append(conv_layer(num_channels, int(2**p), kernel_size=kernel_size, stride=stride, padding=layer_padding, groups=groups))
         #self.model.append(batchnorm_layer(num_kernels*num_channels))
         self.model.append(nn.LeakyReLU(0.2, inplace=True))
+        p -= rate
+
         for i in range(num_blocks):
-            self.model.append(conv_layer(num_kernels*num_channels, num_kernels*num_channels, kernel_size=kernel_size, stride=stride, padding=layer_padding, groups=groups))
+            self.model.append(conv_layer(int(2**(p+rate)), int(2**p), kernel_size=kernel_size, stride=stride, padding=layer_padding, groups=groups))
             #self.model.append(batchnorm_layer(num_kernels*num_channels))
             self.model.append(nn.LeakyReLU(0.2, inplace=True))
+            p -= rate
 
-        self.model.append(conv_layer(num_kernels*num_channels, num_channels, kernel_size=kernel_size, stride=stride, padding=layer_padding, groups=groups))
+        self.model.append(conv_layer(int(2**(p+rate)), num_channels, kernel_size=kernel_size, stride=stride, padding=layer_padding, groups=groups))
         self.model.append(nn.Tanh())
 
         self.model = nn.Sequential(*self.model)
     
     def forward(self, dataframe, noise, mode=None):
         dataframe_plus_noise = dataframe + noise
-        padded_input = self.padder(dataframe_plus_noise)
+        padded_input = F.pad(dataframe_plus_noise, self.required_padding)
         residual = self.model(padded_input)
         out = dataframe + residual
         return out
@@ -579,44 +592,41 @@ class MVTVSSR_Spatial_Discriminator(nn.Module):
             conv_layer = nn.Conv2d
             batchnorm_layer = nn.BatchNorm2d
         elif(mode == "3D"):
-            conv_layer = nn.Conv2d
+            conv_layer = nn.Conv3d
             batchnorm_layer = nn.BatchNorm3d
 
         self.resolution = resolution
         self.model = []
-
+        rate = 0.5
+        base = math.log(num_kernels) / math.log(2)
+        p = base
         if(use_spectral_norm):
-            self.model.append(
-                nn.Sequential(
-                    SpectralNorm(conv_layer(num_channels, num_kernels*num_channels, kernel_size=kernel_size, stride=stride, padding=layer_padding, groups=groups)),
-                    SpectralNorm(batchnorm_layer(num_kernels*num_channels)),
-                    nn.LeakyReLU(0.2, inplace=True)
-                )
-            )
+            self.model.append(SpectralNorm(conv_layer(num_channels, int(2**p), kernel_size=kernel_size, stride=stride, padding=layer_padding, groups=groups)))
+            self.model.append(SpectralNorm(batchnorm_layer(int(2**p))))
+            self.model.append(nn.LeakyReLU(0.2, inplace=True))
+            p += rate
+
             for i in range(num_blocks):
-                self.model.append(nn.Sequential(
-                    SpectralNorm(conv_layer(num_kernels*num_channels, num_kernels*num_channels, kernel_size=kernel_size, stride=stride, padding=layer_padding, groups=groups)),
-                    SpectralNorm(batchnorm_layer(num_kernels*num_channels)),
-                    nn.LeakyReLU(0.2, inplace=True)
-                ))
-            self.model.append(SpectralNorm(conv_layer(num_kernels*num_channels, num_kernels*num_channels, kernel_size=kernel_size, stride=stride, padding=layer_padding, groups=groups)))
+                self.model.append(SpectralNorm(conv_layer(int(2**(p-rate)), int(2**p), 
+                kernel_size=kernel_size, stride=stride, padding=layer_padding, groups=groups)))
+                self.model.append(SpectralNorm(batchnorm_layer(int(2**p))))
+                self.model.append(nn.LeakyReLU(0.2, inplace=True))
+                p += rate
+            self.model.append(SpectralNorm(conv_layer(int(2**(p-rate)), 1, kernel_size=kernel_size, stride=stride, padding=layer_padding, groups=groups)))
         else:
-            self.model.append(
-                nn.Sequential(
-                    conv_layer(num_channels, num_kernels*num_channels, kernel_size=kernel_size, stride=stride, padding=layer_padding),
-                    batchnorm_layer(num_kernels*num_channels),
-                    nn.LeakyReLU(0.2, inplace=True)
-                )
-            )
+            self.model.append(conv_layer(num_channels, int(2**p), kernel_size=kernel_size, stride=stride, padding=layer_padding))
+            self.model.append(batchnorm_layer(int(2**p)))
+            self.model.append(nn.LeakyReLU(0.2, inplace=True))
+            p += 1
 
             for i in range(num_blocks):
-                self.model.append(nn.Sequential(
-                    conv_layer(num_kernels*num_channels, num_kernels*num_channels, kernel_size=kernel_size, stride=stride, padding=layer_padding, groups=num_channels),
-                    batchnorm_layer(num_kernels*num_channels),
-                    nn.LeakyReLU(0.2, inplace=True)
-                ))
+                self.model.append(conv_layer(int(2**(p-1)), int(2**p), 
+                kernel_size=kernel_size, stride=stride, padding=layer_padding, groups=groups))
+                self.model.append(batchnorm_layer(int(2**p)))
+                self.model.append(nn.LeakyReLU(0.2, inplace=True))
+                p += 1
 
-            self.model.append(conv_layer(num_kernels*num_channels, num_kernels*num_channels, kernel_size=kernel_size, stride=stride, padding=layer_padding, groups=num_channels))
+            self.model.append(conv_layer(int(2**(p-1)), 1, kernel_size=kernel_size, stride=stride, padding=layer_padding, groups=groups))
 
         self.model = nn.Sequential(*self.model)
 

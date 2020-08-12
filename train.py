@@ -21,7 +21,9 @@ if __name__ == '__main__':
     parser.add_argument('--save_folder',default=None, help='The folder to save the models folder into')
     parser.add_argument('--save_name',default=None, help='The name for the folder to save the model')
     parser.add_argument('--num_channels',default=None,type=int,help='Number of channels to use')
-    parser.add_argument('--downscale_ratio',default=None,type=float,help='Ratio for x downscaling')
+    parser.add_argument('--spatial_downscale_ratio',default=None,type=float,help='Ratio for spatial downscaling')
+    parser.add_argument('--temporal_downscale_ratio',default=None,type=float,help='Ratio for temporal downscaling')
+    parser.add_argument('--temporal_downscale_mode',default=None,type=float,help='Linear/exponential downscaling. If exponential, see temporal_downscale_ratio')
     parser.add_argument('--min_dimension_size',default=None,type=int,help='Minimum dimension size')
 
     parser.add_argument('--num_blocks',default=None,type=int, help='Num of conv-batchnorm-relu blocks per gen/discrim')

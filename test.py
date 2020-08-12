@@ -81,27 +81,27 @@ with torch.no_grad():
         y = test_frame.clone().cuda().unsqueeze(0)
 
         # Create the low res version of it
-        lr = F.interpolate(y.clone(), size=opt["scales"][0], mode=opt["downsample_mode"], align_corners=True)
+        lr = F.interpolate(y.clone(), size=opt["scales"][0], mode=opt["downsample_mode"])
 
         # Create bilinear upsampling result
-        bilin = F.interpolate(lr.clone(), size=opt["scales"][-1], mode=opt["upsample_mode"], align_corners=True)
+        bilin = F.interpolate(lr.clone(), size=opt["scales"][-1], mode=opt["upsample_mode"])
         
         # Create network reconstructed result
-        x = F.interpolate(y.clone(), size=opt["scales"][0], mode=opt["downsample_mode"], align_corners=True)
-        x = F.interpolate(x, size=opt["scales"][1], mode=opt["upsample_mode"], align_corners=True)
+        x = F.interpolate(y.clone(), size=opt["scales"][0], mode=opt["downsample_mode"])
+        x = F.interpolate(x, size=opt["scales"][1], mode=opt["upsample_mode"])
         x = generate(generators, opt, 1, "reconstruct", x, args["device"]).detach()
         x = x.clamp(min=-1, max=1)
         # Calculate a frame difference for masking
         if i == 0:
             next_frame = dataset.__getitem__(i+1).clone().cuda().unsqueeze(0)
-            next_frame = F.interpolate(next_frame, size=opt["scales"][0], mode=opt["downsample_mode"], align_corners=True)
+            next_frame = F.interpolate(next_frame, size=opt["scales"][0], mode=opt["downsample_mode"])
             frame_diff = torch.abs(next_frame - lr.clone())
 
         else: 
             last_frame = dataset.__getitem__(i-1).clone().cuda().unsqueeze(0)
-            last_frame = F.interpolate(last_frame, size=opt["scales"][0], mode=opt["downsample_mode"], align_corners=True)
+            last_frame = F.interpolate(last_frame, size=opt["scales"][0], mode=opt["downsample_mode"])
             frame_diff = torch.abs(last_frame - lr.clone())
-        frame_diff = F.interpolate(frame_diff, size=opt["scales"][-1], mode=opt["upsample_mode"], align_corners=True)
+        frame_diff = F.interpolate(frame_diff, size=opt["scales"][-1], mode=opt["upsample_mode"])
 
         if rolling_mask is None:
             rolling_mask = torch.zeros(frame_diff.shape).cuda()
