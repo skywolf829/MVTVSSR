@@ -17,7 +17,6 @@ from torch.optim.optimizer import Optimizer, required
 from torch.autograd import Variable
 from torch import Tensor
 from torch.nn import Parameter
-from piq import ssim, psnr
 from matplotlib.pyplot import cm
 from torch.utils.tensorboard import SummaryWriter
 
