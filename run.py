@@ -70,7 +70,8 @@ variables = ["dbz",
 
 arr = []
 for i in range(2, 402):
-    path_to_sim_data = os.path.join(input_folder, "NetCDF", "CM1", "test", "cm1out_00%04d.nc" % (i))
+    print(i)
+    path_to_sim_data = os.path.join(input_folder, "CM1_3D", "test", "cm1out_00%04d.nc" % (i))
     file2read = Dataset(path_to_sim_data,'r',format="NETCDF4")
     dataframe = file2read.variables[variables[0]][:] 
     for j in range(1, len(variables)):

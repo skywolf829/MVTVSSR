@@ -509,7 +509,7 @@ def train_single_scale(process_num, generators, discriminators_s, discriminators
                 writer.add_scalar('Gen_loss_%i' % len(generators), avg_gen_fake, images_seen)
                 writer.add_scalar('Rec_loss_%i' % len(generators), avg_rec, images_seen)
                 writer.add_scalar('Validation_PSNR_%i' % len(generators), validation_avg_psnr, images_seen)
-                next_save += 300
+                next_save += 10
                 
 
         #discriminator_s_scheduler.step()
