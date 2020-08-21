@@ -558,7 +558,7 @@ class MVTVSSR_Generator(nn.Module):
             conv_layer = nn.Conv3d
             batchnorm_layer = nn.BatchNorm3d
             self.required_padding = [pad_amount, pad_amount, pad_amount, pad_amount, pad_amount, pad_amount]
-        rate = 0.5
+        rate = 0.75
         base = math.log(num_kernels) / math.log(2)
         p = base + rate + rate*num_blocks
         self.model.append(conv_layer(num_channels, int(2**p), kernel_size=kernel_size, stride=stride, padding=layer_padding, groups=groups))
