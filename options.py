@@ -19,11 +19,11 @@ class Options():
         opt["train_date_time"]         = None      # The day/time the model was trained (finish time)
         
         # GAN info
-        opt["num_blocks"]              = 3
+        opt["num_blocks"]              = 5
         opt["base_num_kernels"]        = 16        # Num of kernels in smallest scale conv layers
         opt["conv_groups"]             = 1
-        opt["conv_layer_padding"]      = 0         # Padding on conv layers in the GAN
-        opt["network_input_padding"]   = 5         # Padding to do to input to GAN (ideally half the receptive field)
+        opt["conv_layer_padding"]      = 1         # Padding on conv layers in the GAN
+        opt["network_input_padding"]   = 0         # Padding to do to input to GAN (ideally half the receptive field)
         opt["kernel_size"]             = 3
         opt["stride"]                  = 1
         opt["padding_method"]          = "zero"    # Either "zero" or "pbc" padding

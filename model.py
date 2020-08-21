@@ -352,6 +352,8 @@ def train_single_scale(process_num, generators, discriminators_s, discriminators
     discriminator_s = init_discrim_s(len(generators)+1, opt).cuda(gpu_id)
     discriminator_t = init_discrim_t(len(generators)+1, opt).cuda(gpu_id)
 
+    print_to_log_and_console(generator, os.path.join(opt["save_folder"], opt["save_name"]), "log.txt")
+
     if(opt["train_distributed"]):
         generator = nn.parallel.DistributedDataParallel(generator, device_ids=[gpu_id], find_unused_parameters=True)
         discriminator_s = nn.parallel.DistributedDataParallel(discriminator_s, device_ids=[gpu_id], find_unused_parameters=True)
@@ -544,9 +546,9 @@ class MVTVSSR_Generator(nn.Module):
         super(MVTVSSR_Generator, self).__init__()
         self.resolution = resolution
         self.model = []
-
+        self.residual_blocks = []
         # Kernel_size must be odd to pad properly
-        pad_amount = int(((kernel_size - 1) * (num_blocks+2)) / 2)
+        pad_amount = pre_padding
         
         if(mode == "2D"):
             conv_layer = nn.Conv2d
