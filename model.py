@@ -178,7 +178,7 @@ def load_models(opt, device):
     else:
         print_to_log_and_console("Warning: %s doesn't exists - can't load these model parameters" % "MVTVSSRGAN.s_discriminators", 
         os.path.join(opt["save_folder"], opt["save_name"]), "log.txt")
-
+    '''
     if os.path.exists(os.path.join(load_folder, "MVTVSSRGAN.t_discriminators")):
         discrim_params = torch.load(os.path.join(load_folder, "MVTVSSRGAN.t_discriminators"),map_location=device)
         for i in range(opt["n"]):
@@ -196,8 +196,8 @@ def load_models(opt, device):
     else:
         print_to_log_and_console("Warning: %s doesn't exists - can't load these model parameters" % "MVTVSSRGAN.t_discriminators", 
         os.path.join(opt["save_folder"], opt["save_name"]), "log.txt")
-
-    return  generators, discriminators_s, discriminators_t
+    '''
+    return  generators, discriminators_s#, discriminators_t
 
 def save_training_graph(losses, scale_num, opt):
     fig, ax = plt.subplots(4, gridspec_kw={'width_ratios': [0.5]})

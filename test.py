@@ -86,13 +86,13 @@ with torch.no_grad():
         lr = F.interpolate(y.clone(), size=opt["scales"][0], mode=opt["downsample_mode"])
 
         # Create bilinear upsampling result
-        bilin = F.interpolate(lr.clone(), size=opt["scales"][-1], mode=opt["upsample_mode"])
+        BI = F.interpolate(lr.clone(), size=opt["scales"][-1], mode="bicubic")
         
         # Create network reconstructed result
         x = F.interpolate(y.clone(), size=opt["scales"][0], mode=opt["downsample_mode"])
-        x = F.interpolate(x, size=opt["scales"][1], mode=opt["upsample_mode"])
-        x = generate(generators, opt, 1, "reconstruct", x, args["device"]).detach()
+        x = generate(generators, opt, 1, x, args["device"]).detach()
         x = x.clamp(min=-1, max=1)
+        '''
         # Calculate a frame difference for masking
         if i == 0:
             next_frame = dataset.__getitem__(i+1).clone().cuda().unsqueeze(0)
@@ -171,7 +171,7 @@ with torch.no_grad():
 
         second_order_err.append(np.mean(second_order_errs))
         second_order_err_bilin.append(np.mean(second_order_errs_bilin))
-        
+        '''
 
         if(args["visualize"] is not None):
             rec_frames.append(((x.clone().cpu().numpy()[0, args["visualize"],:,:] + 1) * (255/2)).astype(np.uint8))        
@@ -179,25 +179,25 @@ with torch.no_grad():
             masks.append(((mask.clone().cpu().numpy()[0, args["visualize"],:,:]) * (255)).astype(np.uint8))
             diff = torch.abs(y.clone().detach() - x.clone().detach())
             diffs.append((((diff.cpu().numpy()[0, args["visualize"],:,:] / 2) ** 0.35) * (255/1)).astype(np.uint8))
-            bilins.append(((bilin.clone().cpu().numpy()[0, args["visualize"],:,:]+1) * (255/2)).astype(np.uint8))
+            bilins.append(((BI.clone().cpu().numpy()[0, args["visualize"],:,:]+1) * (255/2)).astype(np.uint8))
 
         # Get metrics for the frame
         y = y + 1
         x = x + 1
-        bilin = bilin + 1
+        BI = BI + 1
 
         for j in range(x.shape[1]):
             p1 = psnr(x.clone()[:,j:j+1,:,:], y.clone()[:,j:j+1,:,:], data_range=2., reduction="none").item()
-            p2 = psnr(bilin.clone()[:,j:j+1,:,:], y.clone()[:,j:j+1,:,:], data_range=2., reduction="none").item()
+            p2 = psnr(BI.clone()[:,j:j+1,:,:], y.clone()[:,j:j+1,:,:], data_range=2., reduction="none").item()
             pdiff = p1-p2
             if(len(psnr_diff_per_channel) <= j):
                 psnr_diff_per_channel.append([])
             psnr_diff_per_channel[j].append(pdiff)
 
         p = psnr(x.clone(), y.clone(), data_range=2., reduction="none").item()
-        p_bilin = psnr(bilin.clone(), y.clone(), data_range=2., reduction="none").item()
+        p_bilin = psnr(BI.clone(), y.clone(), data_range=2., reduction="none").item()
         s: Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]] = ssim(x.clone(), y.clone(), data_range=2.).item()
-        s_bilin: Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]] = ssim(bilin.clone(), y.clone(), data_range=2.).item()
+        s_bilin: Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]] = ssim(BI.clone(), y.clone(), data_range=2.).item()
 
         writer.add_scalar('PSNR', p, i)
         writer.add_scalar('SSIM', s, i)

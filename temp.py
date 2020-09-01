@@ -53,3 +53,24 @@ for i in range(len(dataset)):
     p = 20*math.log(2) - 10*math.log(torch.mean((hr - y)**2).item())
     psnrs.append(p)
 print((np.array(psnrs)).mean())
+
+
+opt = load_options(os.path.join(save_folder, "Temp"))
+opt["device"] = [0]
+opt["save_name"] = "Temp"
+generators, discriminators_s = load_models(opt,"cuda:0")
+
+for i in range(len(generators)):
+    generators[i] = generators[i].to(0)
+    generators[i] = generators[i].eval()
+psnrs = []
+for i in range(len(dataset)):
+    test_frame = dataset.__getitem__(i)
+    y = test_frame.clone().cuda().unsqueeze(0)
+    
+    # Create the low res version of it
+    lr = F.interpolate(y.clone(), size=[32, 32], mode="nearest")
+    hr = generate(generators, opt, 1, lr, "cuda:0").detach()
+    p = 20*math.log(2) - 10*math.log(torch.mean((hr - y)**2).item())
+    psnrs.append(p)
+print((np.array(psnrs)).mean())
