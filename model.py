@@ -75,7 +75,7 @@ def init_gen(scale, opt):
     num_kernels = opt["base_num_kernels"]
 
     generator = MVTVSSR_Generator(opt["scales"][scale], opt["num_blocks"], opt["num_channels"],
-    num_kernels, opt["kernel_size"], opt["stride"], opt["pre_padding"], opt['conv_groups'], opt["mode"])
+    num_kernels*4, opt["kernel_size"], opt["stride"], opt["pre_padding"], opt['conv_groups'], opt["mode"])
     weights_init(generator)
     return generator, num_kernels
 
