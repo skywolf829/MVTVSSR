@@ -476,10 +476,9 @@ def train_single_scale(process_num, generators, discriminators_s, opt):
     if(process_num == 0 and opt["train_distributed"]):
         generators.append(generator)
         discriminators_s.append(discriminator_s)
-        discriminators_t.append(discriminator_t)
-        save_models(generators, discriminators_s, discriminators_t, opt)
+        save_models(generators, discriminators_s, opt)
     else:
-        return generator, discriminator_s, discriminator_t
+        return generator, discriminator_s
 
 class MVTVSSR_Generator(nn.Module):
     def __init__ (self, resolution, num_blocks, num_channels, num_kernels, kernel_size, 

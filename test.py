@@ -20,7 +20,7 @@ save_folder = os.path.join(MVTVSSR_folder_path, "SavedModels")
 parser = argparse.ArgumentParser(description='Test a trained model')
 
 parser.add_argument('--load_from',default="Temp",help='The type of input - 2D, 3D, or 2D time-varying')
-parser.add_argument('--data_folder',default="CM1_2/validation",type=str,help='File to train on')
+parser.add_argument('--data_folder',default="Synthetic/testing",type=str,help='File to train on')
 parser.add_argument('--num_testing_examples',default=None,type=int,help='Frames to use from training file')
 parser.add_argument('--device',default="cuda:0",type=str,help='Frames to use from training file')
 parser.add_argument('--visualize',default=None,type=int,help='channel to visualize via creating a GIF thats saved')
@@ -38,9 +38,11 @@ for i in range(len(generators)):
 for i in range(len(discriminators_s)):
     discriminators_s[i].to(args["device"])
     discriminators_s[i].eval()
+'''
 for i in range(len(discriminators_t)):
     discriminators_t[i].to(args["device"])
     discriminators_t[i].eval()
+'''
 
 if(args["num_testing_examples"] is None):
     args["num_testing_examples"] = len(os.listdir(os.path.join(input_folder, args["data_folder"])))
