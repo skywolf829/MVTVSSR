@@ -33,23 +33,6 @@ def weights_init(m):
         m.weight.data.normal_(1.0, 0.02)
         m.bias.data.fill_(0)
 
-def calc_gradient_penalty(discriminator, real_data, fake_data, latent_vector, LAMBDA, device):
-    alpha = torch.rand(1, 1, device=device)
-    alpha = alpha.expand(real_data.size())
-
-    interpolates = alpha * real_data + ((1 - alpha) * fake_data)
-    interpolates = torch.autograd.Variable(interpolates, requires_grad=True)
-
-    disc_interpolates = discriminator(interpolates, latent_vector.detach())
-
-    grad_outputs=torch.ones(disc_interpolates.size()).cuda(device)
-    gradients = torch.autograd.grad(outputs=disc_interpolates, inputs=interpolates,
-                              grad_outputs=grad_outputs,
-                              create_graph=True, retain_graph=True, only_inputs=True)[0]
-
-    gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean() * LAMBDA
-    return gradient_penalty
-
 def reset_grads(model,require_grad):
     for p in model.parameters():
         p.requires_grad_(require_grad)
@@ -76,7 +59,7 @@ def init_scales(opt):
     ns = []
     if(opt["spatial_downscale_ratio"] < 1.0):
         for i in range(len(opt["base_resolution"])):            
-            ns.append(round(math.log(opt["min_dimension_size"] / opt["base_resolution"][i]) / math.log(opt["spatial_downscale_ratio"])) + 1)
+            ns.append(round(math.log(opt["min_dimension_size"] / opt["base_resolution"][i]) / math.log(opt["spatial_downscale_ratio"]))+1)
 
     opt["n"] = min(ns)
     print("The model will have %i scales" % (opt["n"]))
@@ -89,24 +72,18 @@ def init_scales(opt):
         print("Scale %i: %s" % (opt["n"] - 1 - i, str(scaling)))
 
 def init_gen(scale, opt):
-    num_kernels_exp = math.log(opt["base_num_kernels"]) / math.log(2)
-    #num_kernels = int(math.pow(2, num_kernels_exp + ((scale-1) / 4)))
     num_kernels = opt["base_num_kernels"]
 
     generator = MVTVSSR_Generator(opt["scales"][scale], opt["num_blocks"], opt["num_channels"],
-    num_kernels, opt["kernel_size"], opt["stride"], 
-    opt["conv_layer_padding"], opt["network_input_padding"], opt['conv_groups'], opt["mode"])
+    num_kernels, opt["kernel_size"], opt["stride"], opt["pre_padding"], opt['conv_groups'], opt["mode"])
     weights_init(generator)
     return generator, num_kernels
 
 def init_discrim_s(scale, opt):
-    num_kernels_exp = math.log(opt["base_num_kernels"]) / math.log(2)
-    #num_kernels = int(math.pow(2, num_kernels_exp + ((scale-1) / 4)))
     num_kernels = opt["base_num_kernels"]
 
     discriminator = MVTVSSR_Spatial_Discriminator(opt["scales"][scale], opt["num_blocks"], opt["num_channels"],
-    num_kernels, opt["kernel_size"], opt["stride"], 
-    opt["conv_layer_padding"], opt["use_spectral_norm"], opt['conv_groups'], opt["mode"])
+    num_kernels, opt["kernel_size"], opt["stride"], opt["use_spectral_norm"], opt['conv_groups'], opt["mode"])
     weights_init(discriminator)
     return discriminator
 
@@ -120,24 +97,15 @@ def init_discrim_t(scale, opt):
     weights_init(discriminator)
     return discriminator
 
-def generate(generators, opt, minibatch, mode, starting_frames, device):
+def generate(generators, opt, minibatch, starting_frames, device):
 
     generated_image = starting_frames
-
     for i in range(len(generators)):
         generator = generators[i]
-        shape = list(generated_image.shape)
-        if(mode == "random"):
-            noise = opt["noise_amplitudes"][i] * generate_padded_noise(shape, 0, False, device)
-        else:
-            noise = torch.zeros(shape, device=device)
-        generated_image = generator(generated_image, noise, opt["mode"])
-        if(i < len(generators) - 1):
-            generated_image = F.interpolate(generated_image, 
-            size=opt["scales"][i+2], mode=opt["upsample_mode"])
+        generated_image = generator(generated_image)
     return generated_image
 
-def save_models(generators, discriminators_s, discriminators_t, opt):
+def save_models(generators, discriminators_s, opt):
     folder = create_folder(opt["save_folder"], opt["save_name"])
     path_to_save = os.path.join(opt["save_folder"], folder)
     print_to_log_and_console("Saving model to %s" % (path_to_save), 
@@ -153,11 +121,13 @@ def save_models(generators, discriminators_s, discriminators_t, opt):
         for i in range(len(discriminators_s)):
             discrim_states[str(i)] = discriminators_s[i].state_dict()
         torch.save(discrim_states, os.path.join(path_to_save, "MVTVSSRGAN.s_discriminators"))
+    '''
     if(opt["save_discriminators_t"]):
         discrim_states = {}
         for i in range(len(discriminators_t)):
             discrim_states[str(i)] = discriminators_t[i].state_dict()
         torch.save(discrim_states, os.path.join(path_to_save, "MVTVSSRGAN.t_discriminators"))
+    '''
 
     save_options(opt, path_to_save)
 
@@ -267,7 +237,7 @@ def save_training_graph(losses, scale_num, opt):
     return fig, ax
 
 def validation_PSNRs(generators, generator, opt):
-    dataset = Dataset(os.path.join(input_folder, opt["validation_folder"]))
+    dataset = Dataset(os.path.join(input_folder, opt["testing_folder"]))
     psnrs = []
     with torch.no_grad():
         for i in range(len(dataset)):
@@ -279,19 +249,16 @@ def validation_PSNRs(generators, generator, opt):
             
             # Create network reconstructed result
             x = F.interpolate(y.clone(), size=opt["scales"][0], mode=opt["downsample_mode"])
-            x = F.interpolate(x, size=opt["scales"][1], mode=opt["upsample_mode"])
             if(len(generators) > 0):
-                x = generate(generators, opt, 1, "reconstruct", x, opt["device"][0]).detach()
-                x = F.interpolate(x, size=opt["scales"][len(generators)+1], mode=opt["upsample_mode"])
-            x = generator(x, torch.zeros(x.shape, device=opt["device"][0]),opt["mode"])
-            x = x.clamp(min=-1, max=1)
+                x = generate(generators, opt, 1, x, opt["device"][0]).detach()
+            x = generator(x)
             y_lr = F.interpolate(y.clone(), size=opt["scales"][len(generators)+1], mode=opt["downsample_mode"])
 
             p = 20*math.log(2) - 10*math.log(torch.mean((x - y_lr)**2).item())
             psnrs.append(p)
     return (np.array(psnrs)).mean()
 
-def train_single_scale(process_num, generators, discriminators_s, discriminators_t, opt):
+def train_single_scale(process_num, generators, discriminators_s, opt):
     # Distributed - torch will call this with a different process_num (0, ... N-1)
     # Set up distributed environment
     # Locking call - syncs up processes
@@ -308,7 +275,7 @@ def train_single_scale(process_num, generators, discriminators_s, discriminators
         torch.cuda.set_device(gpu_id)
         
     # Initialize the dataset
-    dataset = Dataset(os.path.join(input_folder, opt["data_folder"]), opt)
+    dataset = Dataset(os.path.join(input_folder, opt["training_folder"]), opt)
 
     # Adjust minibatch based on scale size and number of kernels at this scale
     #minibatch_this_scale = int((opt["minibatch"] * (opt["scales"][-1][0] / opt["scales"][len(generators)][0]) * (opt["scales"][-1][1]  / opt["scales"][len(generators)][1])) / num_kernels_factor)
@@ -350,14 +317,14 @@ def train_single_scale(process_num, generators, discriminators_s, discriminators
     generator, num_kernels_this_scale = init_gen(len(generators)+1, opt)
     generator = generator.cuda(gpu_id)
     discriminator_s = init_discrim_s(len(generators)+1, opt).cuda(gpu_id)
-    discriminator_t = init_discrim_t(len(generators)+1, opt).cuda(gpu_id)
+    #discriminator_t = init_discrim_t(len(generators)+1, opt).cuda(gpu_id)
 
     print_to_log_and_console(generator, os.path.join(opt["save_folder"], opt["save_name"]), "log.txt")
 
     if(opt["train_distributed"]):
         generator = nn.parallel.DistributedDataParallel(generator, device_ids=[gpu_id], find_unused_parameters=True)
         discriminator_s = nn.parallel.DistributedDataParallel(discriminator_s, device_ids=[gpu_id], find_unused_parameters=True)
-        discriminator_t = nn.parallel.DistributedDataParallel(discriminator_t, device_ids=[gpu_id], find_unused_parameters=True)
+        #discriminator_t = nn.parallel.DistributedDataParallel(discriminator_t, device_ids=[gpu_id], find_unused_parameters=True)
 
     if(process_num == 0):
         print_to_log_and_console("Process num %i training on GPU %i" % (process_num, gpu_id), 
@@ -382,7 +349,7 @@ def train_single_scale(process_num, generators, discriminators_s, discriminators
 
     generator_optimizer = optim.Adam(generator.parameters(), lr=opt["learning_rate"], betas=(opt["beta_1"],opt["beta_2"]))
     discriminator_s_optimizer = optim.Adam(discriminator_s.parameters(), lr=opt["learning_rate"], betas=(opt["beta_1"],opt["beta_2"]))
-    discriminator_t_optimizer = optim.Adam(discriminator_t.parameters(), lr=opt["learning_rate"], betas=(opt["beta_1"],opt["beta_2"]))
+    #discriminator_t_optimizer = optim.Adam(discriminator_t.parameters(), lr=opt["learning_rate"], betas=(opt["beta_1"],opt["beta_2"]))
     #generator_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer=generator_optimizer,milestones=[1600],gamma=opt["gamma"])
     #discriminator_s_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer=discriminator_s_optimizer,milestones=[1600],gamma=opt["gamma"])
     #discriminator_t_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer=discriminator_t_optimizer,milestones=[1600],gamma=opt["gamma"])
@@ -400,86 +367,60 @@ def train_single_scale(process_num, generators, discriminators_s, discriminators
             # Get our minibatch on the gpu
             minibatch_size = output_dataframes.shape[0]
             output_dataframes = output_dataframes.cuda(non_blocking=True)
-            if(len(generators)+2 < len(opt["scales"])):
+            if(len(generators) + 1 < len(opt["scales"]) - 1):
                 output_dataframes_this_scale = F.interpolate(output_dataframes.clone(), size=opt["scales"][len(generators)+1], mode=opt["downsample_mode"])
             else:
                 output_dataframes_this_scale = output_dataframes.clone()
 
-            # Calculate the noise amplitude needed at this level            
-            if(epoch == 0 and i == 0):
-                criterion = nn.MSELoss().cuda()
-                lowest_res = F.interpolate(output_dataframes.clone(), size=opt["scales"][0], mode=opt["downsample_mode"])
-                if(len(generators) == 0):
-                    reconstructed_frames =  F.interpolate(lowest_res, size=opt["scales"][1], mode=opt["upsample_mode"])
-                    noise_amp = torch.sqrt(criterion(reconstructed_frames, output_dataframes_this_scale)).item()
-                elif(len(generators) > 0):
-                    reconstructed_frames = generate(generators, opt, minibatch_size, "reconstruct", lowest_res.clone(), "cuda:"+str(gpu_id))
-                    reconstructed_frames = F.interpolate(reconstructed_frames, size=opt["scales"][len(generators)+1], mode=opt["upsample_mode"])
-                    noise_amp = torch.sqrt(criterion(reconstructed_frames, output_dataframes_this_scale)).item()
-                opt["noise_amplitudes"].append(noise_amp)
-                
-
-
             # Downsample it to the min scale
             downscaled_dataframes = F.interpolate(output_dataframes.clone(), size=opt["scales"][0], mode=opt["downsample_mode"])
-            # Upsample that to the next scale
-            generated_fake = F.interpolate(downscaled_dataframes, size=opt["scales"][1], mode=opt["upsample_mode"])
             
             # Send through other frozen generators
             if(len(generators) > 0):
-                generated_fake = generate(generators, opt, minibatch_size, "random", generated_fake, "cuda:"+str(gpu_id))
-                # Upscale to this scale now
-                generated_fake = F.interpolate(generated_fake, size=opt["scales"][len(generators)+1], mode=opt["upsample_mode"])
-            
-            # Get random noise scaled by our amplitude at this level
-            noise = opt["noise_amplitudes"][-1]*generate_padded_noise(list(generated_fake.shape), 0, False, opt["mode"], opt["device"][0])
+                LR = generate(generators, opt, minibatch_size, downscaled_dataframes, "cuda:"+str(gpu_id))
+            else:
+                LR = downscaled_dataframes
 
-            # Send input with noise through the current generator in training 
-            generated_fake = generator(generated_fake, noise, opt["mode"])
-            
+            generated = generator(LR)
+
             if(i == 0 and epoch == 0):                
-                writer.add_graph(generator, [generated_fake, noise])
+                writer.add_graph(generator, [LR])
             
             # Update discriminator: maximize D(x) + D(G(z))
-            for j in range(opt["discriminator_steps"]):
+            if(opt["alpha_2"] > 0.0):
+                for j in range(opt["discriminator_steps"]):
+                    # Train with real downscaled to this scale
+                    discriminator_s.zero_grad()
+                    output = discriminator_s(output_dataframes_this_scale)
+                    discrim_error_real = -opt["alpha_2"] * output.mean()
+                    discrim_error_real.backward(retain_graph=True)
+                    losses[0].append(discrim_error_real.detach().item())
+                    # Train with the generated image
+                    output = discriminator_s(generated.detach())
+                    discrim_error_fake = opt["alpha_2"] * output.mean()
+                    discrim_error_fake.backward(retain_graph=True)
+                    losses[1].append(discrim_error_fake.detach().item())
 
-                # Train with real downscaled to this scale
-                discriminator_s.zero_grad()
-                output = discriminator_s(output_dataframes_this_scale)
-                discrim_error_real = -output.mean()
-                discrim_error_real.backward(retain_graph=True)
-                losses[0].append(discrim_error_real.detach().item())
-
-                # Train with the fake generated image
-                output = discriminator_s(generated_fake.detach())
-                discrim_error_fake = output.mean()
-                discrim_error_fake.backward(retain_graph=True)
-                losses[1].append(discrim_error_fake.detach().item())
-
-                discriminator_s_optimizer.step()
-            
+                    discriminator_s_optimizer.step()
             # Update generator: maximize D(G(z))
             for j in range(opt["generator_steps"]):
                 generator.zero_grad()
                 
-                output = discriminator_s(generated_fake.detach())
-                generator_error = -output.mean()
-                generator_error.backward(retain_graph=True)
-                losses[2].append(discrim_error_fake.detach().item())
+                if opt["alpha_2"] > 0.0:
+                    output = discriminator_s(generated.detach())
+                    generator_error = -output.mean() * opt["alpha_2"]
+                    generator_error.backward(retain_graph=True)
+                    losses[2].append(discrim_error_fake.detach().item())
                 
                 loss = nn.MSELoss().cuda(gpu_id)
                 
-                # Generate reconstructed frames for this level
-                lowest_res = F.interpolate(output_dataframes.clone(), size=opt["scales"][0], mode=opt["downsample_mode"])
-                if(len(generators) == 0):
-                    reconstructed_frames =  F.interpolate(lowest_res.clone(), size=opt["scales"][1], mode=opt["upsample_mode"])
-                elif(len(generators) > 0):
-                    reconstructed_frames = generate(generators, opt, minibatch_size, "reconstruct", lowest_res.clone(), "cuda:"+str(gpu_id))
-                    reconstructed_frames = F.interpolate(reconstructed_frames, size=opt["scales"][len(generators)+1], mode=opt["upsample_mode"])
-                reconstructed_frames = generator(reconstructed_frames.detach(), torch.zeros(reconstructed_frames.shape, device=opt["device"][0]),opt["mode"])
+                # Re-compute the constructed image
+                LR = F.interpolate(output_dataframes.clone(), size=opt["scales"][0], mode=opt["downsample_mode"])
+                if(len(generators) > 0):
+                    LR = generate(generators, opt, minibatch_size, LR, "cuda:"+str(gpu_id))
+                reconstructed_frames = generator(LR.detach())
                 
-                
-                rec_loss = opt["alpha"]*loss(reconstructed_frames, output_dataframes_this_scale)
+                rec_loss = opt["alpha_1"]*loss(reconstructed_frames, output_dataframes_this_scale)
                 rec_loss.backward(retain_graph=True)
                 losses[3].append(rec_loss.detach().item())
                 generator_optimizer.step()
@@ -542,51 +483,70 @@ def train_single_scale(process_num, generators, discriminators_s, discriminators
 
 class MVTVSSR_Generator(nn.Module):
     def __init__ (self, resolution, num_blocks, num_channels, num_kernels, kernel_size, 
-    stride, layer_padding, pre_padding, groups, mode):
+    stride, pre_padding, groups, mode):
         super(MVTVSSR_Generator, self).__init__()
         self.resolution = resolution
         self.model = []
+        self.head = []
         self.residual_blocks = []
-        # Kernel_size must be odd to pad properly
-        pad_amount = pre_padding
-        
+        self.post_residual_relus = []
+        self.tail = []
+        self.num_blocks = num_blocks
+        self.pre_padding = pre_padding
+
+        if(pre_padding):
+            pad_amount = int(kernel_size/2)
+            self.layer_padding = 0
+        else:
+            pad_amount = 0
+            self.layer_padding = 1
+
         if(mode == "2D"):
             conv_layer = nn.Conv2d
             batchnorm_layer = nn.BatchNorm2d
             self.required_padding = [pad_amount, pad_amount, pad_amount, pad_amount]
+            self.upscale_method = "bicubic"
         elif(mode == "3D"):
             conv_layer = nn.Conv3d
             batchnorm_layer = nn.BatchNorm3d
             self.required_padding = [pad_amount, pad_amount, pad_amount, pad_amount, pad_amount, pad_amount]
-        rate = 0.75
-        base = math.log(num_kernels) / math.log(2)
-        p = base + rate + rate*num_blocks
-        self.model.append(conv_layer(num_channels, int(2**p), kernel_size=kernel_size, stride=stride, padding=layer_padding, groups=groups))
-        #self.model.append(batchnorm_layer(num_kernels*num_channels))
-        self.model.append(nn.LeakyReLU(0.2, inplace=True))
-        p -= rate
+            self.upscale_method = "trilinear"
+        
+        self.head = conv_layer(num_channels, num_kernels, kernel_size=kernel_size, stride=stride, padding=1, groups=groups)
+        self.model.append(self.head)
 
         for i in range(num_blocks):
-            self.model.append(conv_layer(int(2**(p+rate)), int(2**p), kernel_size=kernel_size, stride=stride, padding=layer_padding, groups=groups))
-            #self.model.append(batchnorm_layer(num_kernels*num_channels))
-            self.model.append(nn.LeakyReLU(0.2, inplace=True))
-            p -= rate
+            residual_block = nn.Sequential(
+                conv_layer(num_kernels, num_kernels, kernel_size=kernel_size, stride=stride, padding=self.layer_padding, groups=groups),
+                nn.LeakyReLU(0.2, inplace=True),
+                conv_layer(num_kernels, num_kernels, kernel_size=kernel_size, stride=stride, padding=self.layer_padding, groups=groups),
+            )
+            post_residual_relu = nn.LeakyReLU(0.2, inplace=True)
+            self.residual_blocks.append(residual_block)
+            self.post_residual_relus.append(post_residual_relu)
+            self.model.append(residual_block)
+            self.model.append(post_residual_relu)
 
-        self.model.append(conv_layer(int(2**(p+rate)), num_channels, kernel_size=kernel_size, stride=stride, padding=layer_padding, groups=groups))
-        self.model.append(nn.Tanh())
-
+        self.tail = conv_layer(num_kernels, num_channels, kernel_size=kernel_size, stride=stride, padding=1, groups=groups)
+        self.model.append(self.tail)
         self.model = nn.Sequential(*self.model)
     
-    def forward(self, dataframe, noise, mode=None):
-        dataframe_plus_noise = dataframe + noise
-        padded_input = F.pad(dataframe_plus_noise, self.required_padding)
-        residual = self.model(padded_input)
-        out = dataframe + residual
-        return out
+    def forward(self, dataframe):
+        frame = dataframe 
+        frame = F.interpolate(frame, size=self.resolution, mode=self.upscale_method)
+        frame = self.head(frame)
+        for i in range(self.num_blocks):
+            residual_frame = frame.clone()
+            if self.pre_padding:
+                residual_frame = F.pad(residual_frame, self.required_padding)
+            frame = frame + self.residual_blocks[i](residual_frame)
+            frame = self.post_residual_relus[i](frame)
+        frame = self.tail(frame)
+        return frame
 
 class MVTVSSR_Spatial_Discriminator(nn.Module):
     def __init__ (self, resolution, num_blocks, num_channels, num_kernels, kernel_size, 
-    stride, layer_padding, use_spectral_norm, groups, mode):
+    stride, use_spectral_norm, groups, mode):
         super(MVTVSSR_Spatial_Discriminator, self).__init__()
 
         if(mode == "2D"):
@@ -598,42 +558,56 @@ class MVTVSSR_Spatial_Discriminator(nn.Module):
 
         self.resolution = resolution
         self.model = []
-        rate = 0.5
-        base = math.log(num_kernels) / math.log(2)
-        p = base
+
         if(use_spectral_norm):
-            self.model.append(SpectralNorm(conv_layer(num_channels, int(2**p), kernel_size=kernel_size, stride=stride, padding=layer_padding, groups=groups)))
-            self.model.append(SpectralNorm(batchnorm_layer(int(2**p))))
+            self.model.append(SpectralNorm(conv_layer(num_channels, num_kernels, 
+            kernel_size=kernel_size, stride=2, padding=0, groups=groups)))
+            self.model.append(SpectralNorm(batchnorm_layer(num_kernels)))
             self.model.append(nn.LeakyReLU(0.2, inplace=True))
-            p += rate
 
-            for i in range(num_blocks):
-                self.model.append(SpectralNorm(conv_layer(int(2**(p-rate)), int(2**p), 
-                kernel_size=kernel_size, stride=stride, padding=layer_padding, groups=groups)))
-                self.model.append(SpectralNorm(batchnorm_layer(int(2**p))))
-                self.model.append(nn.LeakyReLU(0.2, inplace=True))
-                p += rate
-            self.model.append(SpectralNorm(conv_layer(int(2**(p-rate)), 1, kernel_size=kernel_size, stride=stride, padding=layer_padding, groups=groups)))
+            self.model.append(SpectralNorm(conv_layer(num_kernels, num_kernels*2, 
+            kernel_size=kernel_size, stride=2, padding=0, groups=groups)))
+            self.model.append(SpectralNorm(batchnorm_layer(num_kernels*2)))
+            self.model.append(nn.LeakyReLU(0.2, inplace=True))
+
+            self.model.append(SpectralNorm(conv_layer(num_kernels*2, num_kernels*4, 
+            kernel_size=kernel_size, stride=2, padding=0, groups=groups)))
+            self.model.append(SpectralNorm(batchnorm_layer(num_kernels*4)))
+            self.model.append(nn.LeakyReLU(0.2, inplace=True))
+
+            self.model.append(SpectralNorm(conv_layer(num_kernels*4, num_kernels*4, 
+            kernel_size=kernel_size, stride=1, padding=0, groups=groups)))
+            self.model.append(SpectralNorm(batchnorm_layer(num_kernels*4)))
+            self.model.append(nn.LeakyReLU(0.2, inplace=True))
+
+            self.model.append(SpectralNorm(conv_layer(num_kernels*4, 1, kernel_size=kernel_size, stride=stride, padding=0, groups=groups)))
         else:
-            self.model.append(conv_layer(num_channels, int(2**p), kernel_size=kernel_size, stride=stride, padding=layer_padding))
-            self.model.append(batchnorm_layer(int(2**p)))
+            self.model.append(conv_layer(num_channels, num_kernels, 
+            kernel_size=kernel_size, stride=2, padding=layer_padding, groups=groups))
+            self.model.append(batchnorm_layer(num_kernels))
             self.model.append(nn.LeakyReLU(0.2, inplace=True))
-            p += 1
 
-            for i in range(num_blocks):
-                self.model.append(conv_layer(int(2**(p-1)), int(2**p), 
-                kernel_size=kernel_size, stride=stride, padding=layer_padding, groups=groups))
-                self.model.append(batchnorm_layer(int(2**p)))
-                self.model.append(nn.LeakyReLU(0.2, inplace=True))
-                p += 1
+            self.model.append(conv_layer(num_kernels, num_kernels*2, 
+            kernel_size=kernel_size, stride=2, padding=layer_padding, groups=groups))
+            self.model.append(batchnorm_layer(num_kernels))
+            self.model.append(nn.LeakyReLU(0.2, inplace=True))
 
-            self.model.append(conv_layer(int(2**(p-1)), 1, kernel_size=kernel_size, stride=stride, padding=layer_padding, groups=groups))
+            self.model.append(conv_layer(num_kernels*2, num_kernels*4, 
+            kernel_size=kernel_size, stride=2, padding=layer_padding, groups=groups))
+            self.model.append(batchnorm_layer(num_kernels))
+            self.model.append(nn.LeakyReLU(0.2, inplace=True))
+
+            self.model.append(conv_layer(num_kernels*4, num_kernels*4, 
+            kernel_size=kernel_size, stride=1, padding=layer_padding, groups=groups))
+            self.model.append(batchnorm_layer(num_kernels))
+            self.model.append(nn.LeakyReLU(0.2, inplace=True))
+
+            self.model.append(conv_layer(num_kernels*4, 1, kernel_size=kernel_size, stride=stride, padding=layer_padding, groups=groups))
 
         self.model = nn.Sequential(*self.model)
 
     def forward(self, dataframe):
-        out = self.model(dataframe)
-        return out
+        return self.model(dataframe)
 
 class MVTVSSR_Temporal_Discriminator(nn.Module):
     def __init__ (self, resolution, num_blocks, num_channels, num_kernels, kernel_size, 
@@ -700,6 +674,7 @@ class Dataset(torch.utils.data.Dataset):
         data = np.load(os.path.join(self.dataset_location, str(index) + ".npy"))
         if(opt is not None):
             opt["num_channels"] = data.shape[0]
+        '''
         if index == 0:
             for j in range(data.shape[0]):
                 self.channel_mins.append(np.min(data[j]))
@@ -712,11 +687,14 @@ class Dataset(torch.utils.data.Dataset):
                     self.channel_mins[j] = chan_min
                 if(chan_max > self.channel_maxs[j]):
                     self.channel_maxs[j] = chan_max
+        '''
+    '''
     # If a channel is unchanging, min=max, causing a divide by 0 error later. Fix that here.
     for j in range(len(self.channel_mins)):
         if(self.channel_mins[j] == self.channel_maxs[j]):
             self.channel_maxs[j] += 1e-8
             self.channel_mins[j] -= 1e-8
+    '''
 
   def __len__(self):
     return self.num_training_examples
@@ -724,10 +702,12 @@ class Dataset(torch.utils.data.Dataset):
   def __getitem__(self, index):
     data = np.load(os.path.join(self.dataset_location, str(index) + ".npy"))
     # Scale between [-1, 1] per channel for the dataset
+    '''
     for i in range(data.shape[0]):        
         data[i] -= self.channel_mins[i]
         data[i] *= (2/ (self.channel_maxs[i] - self.channel_mins[i]))
         data[i] -= 1 
+    '''
 
     data = np2torch(data, "cpu")
     return data

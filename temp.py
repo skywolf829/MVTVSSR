@@ -39,37 +39,17 @@ input_folder = os.path.join(MVTVSSR_folder_path, "InputData")
 output_folder = os.path.join(MVTVSSR_folder_path, "Output")
 save_folder = os.path.join(MVTVSSR_folder_path, "SavedModels")
 
-parser = argparse.ArgumentParser(description='Test a trained model')
+torch.cuda.set_device(0)
 
-parser.add_argument('--load_from',default="Temp",help='The type of input - 2D, 3D, or 2D time-varying')
-parser.add_argument('--data_folder',default="CM1_2/validation",type=str,help='File to train on')
-parser.add_argument('--num_testing_examples',default=None,type=int,help='Frames to use from training file')
-parser.add_argument('--device',default="cuda:0",type=str,help='Frames to use from training file')
-parser.add_argument('--visualize',default=None,type=int,help='channel to visualize via creating a GIF thats saved')
-
-args = vars(parser.parse_args())
-
-torch.cuda.set_device(args["device"])
-
-entropys = []
-dataset = Dataset(os.path.join(input_folder, args["data_folder"]))
-
-channel = 3
-
-for s in range(15):
-    scale = 1.0 - s * 0.05
-    ents = []
-    for i in range(len(dataset)):
-        # Get the data
-        test_frame = dataset.__getitem__(i).clone().unsqueeze(0).cuda()
-        shape = list(test_frame.shape[2:])
-        shape[0] = int(shape[0] * scale)
-        shape[1] = int(shape[1] * scale)
-        if(s is not 0):
-            test_frame = F.interpolate(test_frame, size=shape, mode='bilinear', align_corners=True)
-        probs = data_to_bin_probability(test_frame[0,channel], 100)
-        #print(probs)
-        ent = calculate_entropy(probs)
-        #print(ent)
-        ents.append(ent)
-    print((np.array(ents)).mean())
+dataset = Dataset(os.path.join(input_folder, "Synthetic", "test"))
+psnrs = []
+for i in range(len(dataset)):
+    test_frame = dataset.__getitem__(i)
+    y = test_frame.clone().cuda().unsqueeze(0)
+    
+    # Create the low res version of it
+    lr = F.interpolate(y.clone(), size=[32, 32], mode="nearest")
+    hr = F.interpolate(lr, size=[128, 128], mode="bicubic")
+    p = 20*math.log(2) - 10*math.log(torch.mean((hr - y)**2).item())
+    psnrs.append(p)
+print((np.array(psnrs)).mean())
