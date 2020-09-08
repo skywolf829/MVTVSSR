@@ -239,15 +239,15 @@ def train_single_scale(generators, discriminators, opt):
     
     # Move all models to this GPU and make them distributed
     for i in range(len(generators)):
-        generators[i].cuda(opt["device"])
+        generators[i].to(opt["device"])
         generators[i].eval()
         for param in generators[i].parameters():
             param.requires_grad = False
     
     # Create the new generator and discriminator for this level
     generator, num_kernels_this_scale = init_gen(len(generators), opt)
-    generator = generator.cuda(opt["device"])
-    discriminator = init_discrim(len(generators), opt).cuda(opt["device"])
+    generator = generator.to(opt["device"])
+    discriminator = init_discrim(len(generators), opt).to(opt["device"])
 
     print_to_log_and_console(generator, os.path.join(opt["save_folder"], opt["save_name"]),
         "log.txt")
@@ -272,11 +272,11 @@ def train_single_scale(generators, discriminators, opt):
 
     # Get properly sized frame for this generator
     full_res = dataset.__getitem__(0)
-    full_res = full_res.cuda(non_blocking=True)
+    full_res = full_res.to()
     
     print(str(len(generators)) + ": " + str(opt["resolutions"][len(generators)]))
     real = F.interpolate(full_res, size=opt["resolutions"][len(generators)],
-    mode=opt["downsample_mode"])
+    mode=opt["downsample_mode"]).to(opt["device"])
 
     optimal_LR = torch.zeros(generator.get_input_shape(), device=opt["device"])
     opt["noise_amplitudes"].append(1.0)
