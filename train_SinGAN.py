@@ -31,7 +31,7 @@ if __name__ == '__main__':
     parser.add_argument('--stride',default=None, type=int,help='Conv stride length')
     
     parser.add_argument('--train_distributed',type=str2bool,default=None, help='Use distributed training')
-    parser.add_argument('--device',nargs="+",type=int,default=None, help='Device to use')
+    parser.add_argument('--device',type=str,default=None, help='Device to use')
     parser.add_argument('--gpus_per_node',default=None, type=int,help='Whether or not to save discriminators')
     parser.add_argument('--num_nodes',default=None, type=int,help='Whether or not to save discriminators')
     parser.add_argument('--ranking',default=None, type=int,help='Whether or not to save discriminators')
