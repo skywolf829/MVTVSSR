@@ -1,9 +1,8 @@
-from model import *
+from SinGAN_models import *
 from options import *
 from utility_functions import *
 import torch.nn.functional as F
 import torch
-from piq import ssim, psnr, multi_scale_ssim
 import os
 import imageio
 import argparse
@@ -41,6 +40,7 @@ save_folder = os.path.join(MVTVSSR_folder_path, "SavedModels")
 
 torch.cuda.set_device(0)
 
+'''
 dataset = Dataset(os.path.join(input_folder, "Synthetic", "test"))
 psnrs = []
 for i in range(len(dataset)):
@@ -74,3 +74,26 @@ for i in range(len(dataset)):
     p = 20*math.log(2) - 10*math.log(torch.mean((hr - y)**2).item())
     psnrs.append(p)
 print((np.array(psnrs)).mean())
+
+'''
+
+
+'''
+arr = np.zeros([2, 512, 512])
+for x in range(arr.shape[1]):
+    for y in range(arr.shape[2]):
+        arr[0, x, y] = (y-256)/256
+        arr[1, x, y] = -(x-256)/256
+
+np.save(os.path.join(input_folder, "Synthetic_VFD", "0_512x512.npy"), arr)
+np.save(os.path.join(input_folder, "Synthetic_VFD", "0_256x256.npy"), arr[:,::2,::2])
+'''
+
+potential = torch.randn([1, 1, 512, 512], device="cuda:0")
+x = spatial_derivative2D(potential, "x", "cuda:0")
+y = spatial_derivative2D(potential, "y", "cuda:0")
+vf = torch.cat([-y, x], axis=1)
+vf = vf.detach().cpu().numpy()[0]
+print(vf.shape)
+np.save(os.path.join(input_folder, "Synthetic_VFD", "0_512x512.npy"), vf)
+np.save(os.path.join(input_folder, "Synthetic_VFD", "0_256x256.npy"), vf[:,::2,::2])

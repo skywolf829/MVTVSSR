@@ -6,52 +6,53 @@ class Options():
         opt = {}
         # Input info
         opt["mode"]                    = "2D"      # What SinGAN to use - 2D or 3D
-        opt["training_folder"]         = "Synthetic/train"
-        opt["testing_folder"]          = "Synthetic/test"
+        opt["training_folder"]         = "Synthetic_VFD"
+        opt["base_resolution"]         = [256, 256]
         opt["num_training_examples"]   = None
         opt["save_folder"]             = "SavedModels"
         opt["save_name"]               = "Temp"    # Folder that the model will be saved to
-        opt["num_channels"]            = None
-        opt["spatial_downscale_ratio"] = 0.5       # Spatial downscale ratio between levels
+        opt["num_channels"]            = 2
+        opt["spatial_downscale_ratio"] = 0.75       # Spatial downscale ratio between levels
         opt["min_dimension_size"]      = 32        # Smallest a dimension can go as the smallest level
         opt["train_date_time"]         = None      # The day/time the model was trained (finish time)
         
         # GAN info
         opt["num_blocks"]              = 5
-        opt["base_num_kernels"]        = 16        # Num of kernels in smallest scale conv layers
+        opt["base_num_kernels"]        = 32        # Num of kernels in smallest scale conv layers
         opt["pre_padding"]             = False         # Padding on conv layers in the GAN
         opt["kernel_size"]             = 3
         opt["stride"]                  = 1
         opt['conv_groups']             = 1
         
-        opt["n"]                       = 5         # Number of scales in the heirarchy, defined by the input and min_dimension_size
-        opt["scales"]                  = []        # The scales for the GAN
-        opt["base_resolution"]         = [128, 128]# Base resolution for full scale images [rows, cols] aka [y, x] aka [height, width]
-        opt["use_spectral_norm"]       = True
+        opt["n"]                       = 0         # Number of scales in the heirarchy, defined by the input and min_dimension_size
+        opt["resolutions"]             = []        # The scales for the GAN
+        opt["noise_amplitudes"]        = []
+        opt["use_spectral_norm"]       = False
         opt["downsample_mode"]         = "nearest"
         opt["upsample_mode"]           = "bicubic"
 
         opt["train_distributed"]       = False
-        opt["device"]                  = [0]
+        opt["device"]                  = "cuda:0"
         opt["gpus_per_node"]           = 1
         opt["num_nodes"]               = 1
         opt["ranking"]                 = 0
         opt["save_generators"]         = True
-        opt["save_discriminators_s"]   = True
-        opt["save_discriminators_t"]   = True
+        opt["save_discriminators"]     = True
+        opt["physical_constraints"]    = "hard"
 
         # GAN training info
-        opt["alpha_1"]                 = 10        # Reconstruction loss coefficient
+        opt["alpha_1"]                 = 100       # Reconstruction loss coefficient
         opt["alpha_2"]                 = 1        # Adversarial loss coefficient
+        opt["alpha_3"]                 = 1        # Soft physical loss coefficient
         opt["generator_steps"]         = 3
         opt["discriminator_steps"]     = 3
-        opt["epochs"]                  = 5
+        opt["epochs"]                  = 2000
         opt["minibatch"]               = 1        # Minibatch for training
         opt["num_workers"]             = 0
-        opt["learning_rate"]           = 0.0001    # Learning rate for GAN
-        opt["beta_1"]                  = 0.0
+        opt["learning_rate"]           = 0.0005    # Learning rate for GAN
+        opt["beta_1"]                  = 0.5
         opt["beta_2"]                  = 0.999
-        opt["gamma"]                   = 0.1   
+        opt["gamma"]                   = 0.1
 
         # Info during training (to continue if it stopped)
         opt["scale_in_training"]       = 0
