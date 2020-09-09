@@ -41,6 +41,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--alpha_1',default=None, type=float,help='Reconstruction loss coefficient')
     parser.add_argument('--alpha_2',default=None, type=float,help='Adversarial loss coefficient')
+    parser.add_argument('--alpha_3',default=None, type=float,help='Soft physical constraint loss coefficient')
     parser.add_argument('--generator_steps',default=None, type=int,help='Number of generator steps to take')
     parser.add_argument('--discriminator_steps',default=None, type=int,help='Number of discriminator steps to take')
     parser.add_argument('--epochs',default=None, type=int,help='Number of epochs to use')
