@@ -58,6 +58,12 @@ def spatial_derivative2D(field, axis, device):
         output = F.conv2d(field, weights)
     return output
 
+def angle_and_mag_difference(t1, t2):
+    mag_diff = torch.abs(torch.norm(t1.view(-1, 2), dim=1) - torch.norm(t2.view(-1, 2), dim=1))
+    ang_diff = torch.acos(torch.bmm(t1.view(-1, 1, 2), t2.view(-1, 2, 1)) / (torch.norm(t1.view(-1, 2), dim=1)+torch.norm(t2.view(-1, 2), dim=1)))
+    return mag_diff, ang_diff
+
+
 def l2normalize(v, eps=1e-12):
     return v / (v.norm() + eps)
 
@@ -335,6 +341,7 @@ def train_single_scale(generators, discriminators, opt):
             opt["noise_amplitudes"][-1]*generator.optimal_noise)
 
             g = TAD(optimal_reconstruction, opt["device"])            
+            mags, angles = angle_and_mag_difference(optimal_reconstruction, real)
 
             if(opt["physical_constraints"] == "soft"):
                 phys_loss = opt["alpha_3"] * g 
@@ -348,6 +355,8 @@ def train_single_scale(generators, discriminators, opt):
         writer.add_scalar('G_loss_scale%i'%len(generators), G_loss, epoch) 
         writer.add_scalar('Rec_loss_scale%i'%len(generators), rec_loss, epoch) 
         writer.add_scalar('TAD_scale%i'%len(generators), g, epoch)
+        writer.add_scalar('Mag_loss_scale%i'%len(generators), mags.mean(), epoch) 
+        writer.add_scalar('Angle_loss_scale%i'%len(generators), angles.mean(), epoch) 
 
     generator = reset_grads(generator, False)
     generator.eval()
