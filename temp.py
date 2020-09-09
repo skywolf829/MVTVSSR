@@ -78,7 +78,7 @@ print((np.array(psnrs)).mean())
 '''
 
 
-'''
+
 arr = np.zeros([2, 512, 512])
 for x in range(arr.shape[1]):
     for y in range(arr.shape[2]):
@@ -87,8 +87,9 @@ for x in range(arr.shape[1]):
 
 np.save(os.path.join(input_folder, "Synthetic_VFD", "0_512x512.npy"), arr)
 np.save(os.path.join(input_folder, "Synthetic_VFD", "0_256x256.npy"), arr[:,::2,::2])
-'''
 
+
+'''
 potential = torch.randn([1, 1, 512, 512], device="cuda:0")
 x = spatial_derivative2D(potential, "x", "cuda:0")
 y = spatial_derivative2D(potential, "y", "cuda:0")
@@ -97,3 +98,4 @@ vf = vf.detach().cpu().numpy()[0]
 print(vf.shape)
 np.save(os.path.join(input_folder, "Synthetic_VFD", "0_512x512.npy"), vf)
 np.save(os.path.join(input_folder, "Synthetic_VFD", "0_256x256.npy"), vf[:,::2,::2])
+'''

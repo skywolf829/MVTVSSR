@@ -60,8 +60,12 @@ def spatial_derivative2D(field, axis, device):
 
 def angle_and_mag_difference(t1, t2):
     mag_diff = torch.abs(torch.norm(t1.view(-1, 2), dim=1) - torch.norm(t2.view(-1, 2), dim=1))
-    ang_diff = torch.acos(torch.bmm(t1.view(-1, 1, 2), t2.view(-1, 2, 1))[:,0,0] / (torch.norm(t1.view(-1, 2), dim=1)*torch.norm(t2.view(-1, 2), dim=1)))
-    return mag_diff, ang_diff
+    inner_prod = (t1.view(-1, 2) * t2.view(-1, 2)).sum(dim=1)
+    t1_norm = t1.view(-1, 2).pow(2).sum(dim=1).pow(0.5)
+    t2_norm = t2.view(-1, 2).pow(2).sum(dim=1).pow(0.5)
+    c = inner_prod / (2*t1_norm*t2_norm)
+    angle_diff = torch.acos(c)
+    return mag_diff, angle_diff
 
 
 def l2normalize(v, eps=1e-12):

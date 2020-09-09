@@ -147,3 +147,70 @@ W0908 00:42:35.992054 12332 plugin_event_accumulator.py:330] Found more than one
 W0908 00:42:35.992054 12332 plugin_event_accumulator.py:368] Found more than one "run metadata" event with tag step1. Overwriting it with the newest event.
 W0908 00:46:09.162753 12332 plugin_event_accumulator.py:330] Found more than one graph event per run, or there was a metagraph containing a graph_def, as well as one or more graph events.  Overwriting the graph with the newest event.
 W0908 00:46:09.162753 12332 plugin_event_accumulator.py:368] Found more than one "run metadata" event with tag step1. Overwriting it with the newest event.
+TensorFlow installation not found - running with reduced feature set.
+W0909 15:49:27.875155 14788 plugin_event_accumulator.py:330] Found more than one graph event per run, or there was a metagraph containing a graph_def, as well as one or more graph events.  Overwriting the graph with the newest event.
+W0909 15:49:27.876155 14788 plugin_event_accumulator.py:368] Found more than one "run metadata" event with tag step1. Overwriting it with the newest event.
+Serving TensorBoard on localhost; to expose to the network, use a proxy or pass --bind_all
+TensorBoard 2.2.1 at http://localhost:6006/ (Press CTRL+C to quit)
+W0909 15:49:30.469155 14788 plugin_event_accumulator.py:330] Found more than one graph event per run, or there was a metagraph containing a graph_def, as well as one or more graph events.  Overwriting the graph with the newest event.
+W0909 15:49:30.469155 14788 plugin_event_accumulator.py:368] Found more than one "run metadata" event with tag step1. Overwriting it with the newest event.
+W0909 15:49:33.146155 14788 plugin_event_accumulator.py:330] Found more than one graph event per run, or there was a metagraph containing a graph_def, as well as one or more graph events.  Overwriting the graph with the newest event.
+W0909 15:49:33.146155 14788 plugin_event_accumulator.py:368] Found more than one "run metadata" event with tag step1. Overwriting it with the newest event.
+W0909 15:49:35.768155 14788 plugin_event_accumulator.py:330] Found more than one graph event per run, or there was a metagraph containing a graph_def, as well as one or more graph events.  Overwriting the graph with the newest event.
+W0909 15:49:35.769155 14788 plugin_event_accumulator.py:368] Found more than one "run metadata" event with tag step1. Overwriting it with the newest event.
+W0909 15:49:38.400155 14788 plugin_event_accumulator.py:330] Found more than one graph event per run, or there was a metagraph containing a graph_def, as well as one or more graph events.  Overwriting the graph with the newest event.
+W0909 15:49:38.400155 14788 plugin_event_accumulator.py:368] Found more than one "run metadata" event with tag step1. Overwriting it with the newest event.
+W0909 15:49:41.227155 14788 plugin_event_accumulator.py:330] Found more than one graph event per run, or there was a metagraph containing a graph_def, as well as one or more graph events.  Overwriting the graph with the newest event.
+W0909 15:49:41.227155 14788 plugin_event_accumulator.py:368] Found more than one "run metadata" event with tag step1. Overwriting it with the newest event.
+W0909 15:49:44.057156 14788 plugin_event_accumulator.py:330] Found more than one graph event per run, or there was a metagraph containing a graph_def, as well as one or more graph events.  Overwriting the graph with the newest event.
+W0909 15:49:44.057156 14788 plugin_event_accumulator.py:368] Found more than one "run metadata" event with tag step1. Overwriting it with the newest event.
+W0909 15:49:46.798155 14788 plugin_event_accumulator.py:330] Found more than one graph event per run, or there was a metagraph containing a graph_def, as well as one or more graph events.  Overwriting the graph with the newest event.
+W0909 15:49:46.798155 14788 plugin_event_accumulator.py:368] Found more than one "run metadata" event with tag step1. Overwriting it with the newest event.
+W0909 15:49:49.367156 14788 plugin_event_accumulator.py:330] Found more than one graph event per run, or there was a metagraph containing a graph_def, as well as one or more graph events.  Overwriting the graph with the newest event.
+W0909 15:49:49.367156 14788 plugin_event_accumulator.py:368] Found more than one "run metadata" event with tag step1. Overwriting it with the newest event.
+W0909 15:49:52.123156 14788 plugin_event_accumulator.py:330] Found more than one graph event per run, or there was a metagraph containing a graph_def, as well as one or more graph events.  Overwriting the graph with the newest event.
+W0909 15:49:52.123156 14788 plugin_event_accumulator.py:368] Found more than one "run metadata" event with tag step1. Overwriting it with the newest event.
+W0909 15:49:54.646155 14788 plugin_event_accumulator.py:330] Found more than one graph event per run, or there was a metagraph containing a graph_def, as well as one or more graph events.  Overwriting the graph with the newest event.
+W0909 15:49:54.646155 14788 plugin_event_accumulator.py:368] Found more than one "run metadata" event with tag step1. Overwriting it with the newest event.
+W0909 15:49:57.496197 14788 plugin_event_accumulator.py:330] Found more than one graph event per run, or there was a metagraph containing a graph_def, as well as one or more graph events.  Overwriting the graph with the newest event.
+W0909 15:49:57.496197 14788 plugin_event_accumulator.py:368] Found more than one "run metadata" event with tag step1. Overwriting it with the newest event.
+W0909 15:50:00.009196 14788 plugin_event_accumulator.py:330] Found more than one graph event per run, or there was a metagraph containing a graph_def, as well as one or more graph events.  Overwriting the graph with the newest event.
+W0909 15:50:00.009196 14788 plugin_event_accumulator.py:368] Found more than one "run metadata" event with tag step1. Overwriting it with the newest event.
+W0909 15:50:02.863197 14788 plugin_event_accumulator.py:330] Found more than one graph event per run, or there was a metagraph containing a graph_def, as well as one or more graph events.  Overwriting the graph with the newest event.
+W0909 15:50:02.863197 14788 plugin_event_accumulator.py:368] Found more than one "run metadata" event with tag step1. Overwriting it with the newest event.
+W0909 15:50:05.400197 14788 plugin_event_accumulator.py:330] Found more than one graph event per run, or there was a metagraph containing a graph_def, as well as one or more graph events.  Overwriting the graph with the newest event.
+W0909 15:50:05.400197 14788 plugin_event_accumulator.py:368] Found more than one "run metadata" event with tag step1. Overwriting it with the newest event.
+W0909 15:50:10.872205 14788 plugin_event_accumulator.py:330] Found more than one graph event per run, or there was a metagraph containing a graph_def, as well as one or more graph events.  Overwriting the graph with the newest event.
+W0909 15:50:10.872205 14788 plugin_event_accumulator.py:368] Found more than one "run metadata" event with tag step1. Overwriting it with the newest event.
+W0909 15:50:13.407211 14788 plugin_event_accumulator.py:330] Found more than one graph event per run, or there was a metagraph containing a graph_def, as well as one or more graph events.  Overwriting the graph with the newest event.
+W0909 15:50:13.407211 14788 plugin_event_accumulator.py:368] Found more than one "run metadata" event with tag step1. Overwriting it with the newest event.
+W0909 15:50:16.405204 14788 plugin_event_accumulator.py:330] Found more than one graph event per run, or there was a metagraph containing a graph_def, as well as one or more graph events.  Overwriting the graph with the newest event.
+W0909 15:50:16.405204 14788 plugin_event_accumulator.py:368] Found more than one "run metadata" event with tag step1. Overwriting it with the newest event.
+W0909 15:50:18.980205 14788 plugin_event_accumulator.py:330] Found more than one graph event per run, or there was a metagraph containing a graph_def, as well as one or more graph events.  Overwriting the graph with the newest event.
+W0909 15:50:18.981205 14788 plugin_event_accumulator.py:368] Found more than one "run metadata" event with tag step1. Overwriting it with the newest event.
+W0909 15:50:21.526205 14788 plugin_event_accumulator.py:330] Found more than one graph event per run, or there was a metagraph containing a graph_def, as well as one or more graph events.  Overwriting the graph with the newest event.
+W0909 15:50:21.527204 14788 plugin_event_accumulator.py:368] Found more than one "run metadata" event with tag step1. Overwriting it with the newest event.
+W0909 15:50:24.622205 14788 plugin_event_accumulator.py:330] Found more than one graph event per run, or there was a metagraph containing a graph_def, as well as one or more graph events.  Overwriting the graph with the newest event.
+W0909 15:50:24.623205 14788 plugin_event_accumulator.py:368] Found more than one "run metadata" event with tag step1. Overwriting it with the newest event.
+W0909 15:50:27.164205 14788 plugin_event_accumulator.py:330] Found more than one graph event per run, or there was a metagraph containing a graph_def, as well as one or more graph events.  Overwriting the graph with the newest event.
+W0909 15:50:27.165205 14788 plugin_event_accumulator.py:368] Found more than one "run metadata" event with tag step1. Overwriting it with the newest event.
+W0909 15:50:39.735009 14788 plugin_event_accumulator.py:330] Found more than one graph event per run, or there was a metagraph containing a graph_def, as well as one or more graph events.  Overwriting the graph with the newest event.
+W0909 15:50:39.735009 14788 plugin_event_accumulator.py:368] Found more than one "run metadata" event with tag step1. Overwriting it with the newest event.
+W0909 15:51:09.990379 14788 plugin_event_accumulator.py:330] Found more than one graph event per run, or there was a metagraph containing a graph_def, as well as one or more graph events.  Overwriting the graph with the newest event.
+W0909 15:51:09.991379 14788 plugin_event_accumulator.py:368] Found more than one "run metadata" event with tag step1. Overwriting it with the newest event.
+W0909 15:52:25.416497 14788 plugin_event_accumulator.py:330] Found more than one graph event per run, or there was a metagraph containing a graph_def, as well as one or more graph events.  Overwriting the graph with the newest event.
+W0909 15:52:25.416497 14788 plugin_event_accumulator.py:368] Found more than one "run metadata" event with tag step1. Overwriting it with the newest event.
+W0909 15:52:50.575432 14788 plugin_event_accumulator.py:330] Found more than one graph event per run, or there was a metagraph containing a graph_def, as well as one or more graph events.  Overwriting the graph with the newest event.
+W0909 15:52:50.575432 14788 plugin_event_accumulator.py:368] Found more than one "run metadata" event with tag step1. Overwriting it with the newest event.
+W0909 15:53:15.853079 14788 plugin_event_accumulator.py:330] Found more than one graph event per run, or there was a metagraph containing a graph_def, as well as one or more graph events.  Overwriting the graph with the newest event.
+W0909 15:53:15.853079 14788 plugin_event_accumulator.py:368] Found more than one "run metadata" event with tag step1. Overwriting it with the newest event.
+W0909 15:54:46.262292 14788 plugin_event_accumulator.py:330] Found more than one graph event per run, or there was a metagraph containing a graph_def, as well as one or more graph events.  Overwriting the graph with the newest event.
+W0909 15:54:46.262292 14788 plugin_event_accumulator.py:368] Found more than one "run metadata" event with tag step1. Overwriting it with the newest event.
+W0909 15:58:17.087729 14788 plugin_event_accumulator.py:330] Found more than one graph event per run, or there was a metagraph containing a graph_def, as well as one or more graph events.  Overwriting the graph with the newest event.
+W0909 15:58:17.087729 14788 plugin_event_accumulator.py:368] Found more than one "run metadata" event with tag step1. Overwriting it with the newest event.
+W0909 15:58:37.244852 14788 plugin_event_accumulator.py:330] Found more than one graph event per run, or there was a metagraph containing a graph_def, as well as one or more graph events.  Overwriting the graph with the newest event.
+W0909 15:58:37.245852 14788 plugin_event_accumulator.py:368] Found more than one "run metadata" event with tag step1. Overwriting it with the newest event.
+W0909 16:00:02.658901 14788 plugin_event_accumulator.py:330] Found more than one graph event per run, or there was a metagraph containing a graph_def, as well as one or more graph events.  Overwriting the graph with the newest event.
+W0909 16:00:02.658901 14788 plugin_event_accumulator.py:368] Found more than one "run metadata" event with tag step1. Overwriting it with the newest event.
+W0909 16:00:17.728884 14788 plugin_event_accumulator.py:330] Found more than one graph event per run, or there was a metagraph containing a graph_def, as well as one or more graph events.  Overwriting the graph with the newest event.
+W0909 16:00:17.728884 14788 plugin_event_accumulator.py:368] Found more than one "run metadata" event with tag step1. Overwriting it with the newest event.
