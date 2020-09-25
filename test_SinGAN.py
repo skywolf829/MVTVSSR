@@ -37,8 +37,8 @@ save_folder = os.path.join(MVTVSSR_folder_path, "SavedModels")
 
 parser = argparse.ArgumentParser(description='Test a trained model')
 
-parser.add_argument('--load_from',default="Temp",help='The type of input - 2D, 3D, or 2D time-varying')
-parser.add_argument('--data_folder',default="Synthetic/testing",type=str,help='File to train on')
+parser.add_argument('--load_from',default="Temp")
+parser.add_argument('--data_folder',default="first_sim",type=str,help='File to test on')
 parser.add_argument('--device',default="cuda:0",type=str,help='Frames to use from training file')
 
 args = vars(parser.parse_args())
@@ -55,35 +55,25 @@ for i in range(len(discriminators)):
     discriminators[i].to(args["device"])
     discriminators[i].eval()
 
-frame_LR = np.load(os.path.join(input_folder, "Synthetic_VFD", "0_256x256.npy"))
-print(TAD(np2torch(frame_LR, opt["device"]).unsqueeze(0), opt["device"]))
-display_2d(frame_LR)
+dataset = Dataset(os.path.join(input_folder, 'first_sim'), opt)
 
-frame_HR = np.load(os.path.join(input_folder, "Synthetic_VFD HR", "0_512x512.npy"))
-print(TAD(np2torch(frame_HR, opt["device"]).unsqueeze(0), opt["device"]))
-display_2d_mag(frame_HR)
-lr_torch = np2torch(frame_LR, opt["device"]).unsqueeze(0)
+frame_LR = dataset.__getitem__(0).to(opt['device'])
+print(frame_LR.shape)
+print(TAD(dataset.unscale(frame_LR), opt["device"]).sum())
+plt.imshow(toImg(frame_LR.cpu().numpy()[0]).swapaxes(0,2).swapaxes(0,1))
+plt.show()
 
-t = super_resolution(generators[-1], lr_torch, 2, opt, opt["device"])
+scaling = 2
+t = F.interpolate(frame_LR, scale_factor=scaling,mode=opt["upsample_mode"])
+print(TAD(dataset.unscale(t), opt["device"]).sum())
+t = t[0].detach().cpu().numpy()
+plt.imshow(toImg(t).swapaxes(0,2).swapaxes(0,1))
+plt.show()
+
+t = super_resolution(generators[-1], frame_LR, scaling, opt, opt["device"])
+print(TAD(dataset.unscale(t), opt["device"]).sum())
 t = torch.clamp(t, -1, 1)[0].detach().cpu().numpy()
-display_2d_mag(t)
-p = 20*log(2) - 10 * log(np.mean((t-frame_HR)**2))
-print(p)
-
-lr_2_hr = F.interpolate(lr_torch, size=[512, 512], mode="bicubic")[0].detach().cpu().numpy()
-display_2d_mag(lr_2_hr)
-p = 20*log(2) - 10 * log(np.mean((lr_2_hr-frame_HR)**2))
-print(p)
-
-
-
-'''
-plt.imshow(frame_LR)
-plt.show()
-plt.imshow(reconstruct)
-plt.show()
-plt.imshow(frame_HR)
+plt.imshow(toImg(t).swapaxes(0,2).swapaxes(0,1))
 plt.show()
 
-'''
 

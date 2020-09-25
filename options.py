@@ -6,12 +6,13 @@ class Options():
         opt = {}
         # Input info
         opt["mode"]                    = "2D"      # What SinGAN to use - 2D or 3D
-        opt["training_folder"]         = "Synthetic_VFD"
-        opt["base_resolution"]         = [256, 256]
-        opt["num_training_examples"]   = None
+        opt["training_folder"]         = "JHUTurbulence/isotropic1024coarse"
+        opt["image_normalize"]         = False
+        opt["scale_data"]              = False
+        opt['scale_on_magnitude']      = True
         opt["save_folder"]             = "SavedModels"
         opt["save_name"]               = "Temp"    # Folder that the model will be saved to
-        opt["num_channels"]            = 2
+        opt["num_channels"]            = 3
         opt["spatial_downscale_ratio"] = 0.75       # Spatial downscale ratio between levels
         opt["min_dimension_size"]      = 32        # Smallest a dimension can go as the smallest level
         opt["train_date_time"]         = None      # The day/time the model was trained (finish time)
@@ -23,11 +24,12 @@ class Options():
         opt["kernel_size"]             = 3
         opt["stride"]                  = 1
         opt['conv_groups']             = 1
+        opt['separate_chans']          = False
         
         opt["n"]                       = 0         # Number of scales in the heirarchy, defined by the input and min_dimension_size
         opt["resolutions"]             = []        # The scales for the GAN
         opt["noise_amplitudes"]        = []
-        opt["use_spectral_norm"]       = False
+        opt["use_spectral_norm"]       = True
         opt["downsample_mode"]         = "nearest"
         opt["upsample_mode"]           = "bicubic"
 
@@ -38,12 +40,12 @@ class Options():
         opt["ranking"]                 = 0
         opt["save_generators"]         = True
         opt["save_discriminators"]     = True
-        opt["physical_constraints"]    = "hard"
+        opt["physical_constraints"]    = "none"
 
         # GAN training info
-        opt["alpha_1"]                 = 10       # Reconstruction loss coefficient
+        opt["alpha_1"]                 = 100       # Reconstruction loss coefficient
         opt["alpha_2"]                 = 1        # Adversarial loss coefficient
-        opt["alpha_3"]                 = .5        # Soft physical loss coefficient
+        opt["alpha_3"]                 = .1        # Soft physical loss coefficient
         opt["generator_steps"]         = 3
         opt["discriminator_steps"]     = 3
         opt["epochs"]                  = 2000

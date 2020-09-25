@@ -9,6 +9,21 @@ import scipy
 import math
 import numbers
 from torch.nn import functional as F
+from matplotlib.pyplot import cm
+
+
+def toImg(vectorField):
+    if(vectorField.shape[0] == 1):
+        return cm.coolwarm(vectorField[0]).swapaxes(0,2).swapaxes(1,2)
+    elif(vectorField.shape[0] == 2):
+        vectorField += 1
+        vectorField *= 0.5
+        vectorField = vectorField.clip(0, 1)
+        z = np.zeros([1, vectorField.shape[1], vectorField.shape[2]])
+        vectorField = np.concatenate([vectorField, z])
+        return vectorField
+    elif(vectorField.shape[0] == 3):
+        return vectorField
 
 def feature_distance(img1, img2):
     if(features_model is None):
