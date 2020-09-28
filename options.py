@@ -43,10 +43,10 @@ class Options():
         opt["physical_constraints"]    = "none"
 
         # GAN training info
-        opt["alpha_1"]                 = 0       # Reconstruction loss coefficient
+        opt["alpha_1"]                 = 100       # Reconstruction loss coefficient
         opt["alpha_2"]                 = 1        # Adversarial loss coefficient
         opt["alpha_3"]                 = 0        # Soft physical loss coefficient
-        opt["alpha_4"]                 = 1          # mag_and_angle loss
+        opt["alpha_4"]                 = 0          # mag_and_angle loss
         opt["generator_steps"]         = 3
         opt["discriminator_steps"]     = 3
         opt["epochs"]                  = 2000

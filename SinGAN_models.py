@@ -122,7 +122,7 @@ def init_gen(scale, opt):
 
     generator = SinGAN_Generator(opt["resolutions"][scale], opt["num_blocks"], 
     opt["num_channels"], num_kernels, opt["kernel_size"], opt["stride"], 
-    opt["pre_padding"], opt["mode"], opt["physical_constraints"], opt['separate_chans'],
+    opt["pre_padding"], opt["mode"], opt["physical_constraints"], scale, opt['separate_chans'],
     opt["device"])
 
     weights_init(generator)
@@ -473,16 +473,20 @@ def train_single_scale(generators, discriminators, opt):
 
 class SinGAN_Generator(nn.Module):
     def __init__ (self, resolution, num_blocks, num_channels, num_kernels, kernel_size,
-    stride, pre_padding, mode, physical_constraints, separate_chans, device):
+    stride, pre_padding, mode, physical_constraints, separate_chans, scale, device):
         super(SinGAN_Generator, self).__init__()
-        
+        self.scale = scale
         self.pre_padding = pre_padding
         self.resolution = resolution
         self.num_channels = num_channels
-        self.optimal_noise = torch.randn(self.get_input_shape(), device=device)
+        if(scale == 0):
+            self.optimal_noise = torch.randn(self.get_input_shape(), device=device)
+        else:
+            self.optimal_noise = torch.zeros(self.get_input_shape(), device=device)
         self.physical_constraints = physical_constraints
         self.device = device
         self.separate_chans = separate_chans
+
         if(physical_constraints == "hard" and mode == "2D"):
             output_chans = 1
         else:
