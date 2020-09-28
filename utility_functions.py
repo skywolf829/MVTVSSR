@@ -12,18 +12,36 @@ from torch.nn import functional as F
 from matplotlib.pyplot import cm
 
 
-def toImg(vectorField):
-    if(vectorField.shape[0] == 1):
-        return cm.coolwarm(vectorField[0]).swapaxes(0,2).swapaxes(1,2)
-    elif(vectorField.shape[0] == 2):
-        vectorField += 1
-        vectorField *= 0.5
-        vectorField = vectorField.clip(0, 1)
-        z = np.zeros([1, vectorField.shape[1], vectorField.shape[2]])
-        vectorField = np.concatenate([vectorField, z])
-        return vectorField
-    elif(vectorField.shape[0] == 3):
-        return vectorField
+def toImg(vectorField, renorm_channels = False):
+    vf = vectorField.copy()
+    if(vf.shape[0] == 1):
+        return cm.coolwarm(vf[0]).swapaxes(0,2).swapaxes(1,2)
+    elif(vf.shape[0] == 2):
+        vf += 1
+        vf *= 0.5
+        vf = vf.clip(0, 1)
+        z = np.zeros([1, vf.shape[1], vf.shape[2]])
+        vf = np.concatenate([vf, z])
+        return vf
+    elif(vf.shape[0] == 3):
+        if(renorm_channels):
+            for j in range(vf.shape[0]):
+                vf[j] -= vf[j].min()
+                vf[j] *= (1 / vf[j].max())
+        return vf
+
+def to_mag(vectorField, normalize=True, max_mag = None):
+    vf = vectorField.copy()
+    r = np.zeros(vf.shape)
+    for i in range(vf.shape[0]):
+        r[0] += vf[i]**2
+    r[0] **= 0.5
+    if(normalize):
+        if max_mag is None:
+            r[0] *= (2 / r[0].max())
+        else:
+            r[0] *= (2 / max_mag)
+    return r[0:1]
 
 def feature_distance(img1, img2):
     if(features_model is None):

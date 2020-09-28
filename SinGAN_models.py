@@ -61,7 +61,7 @@ def spatial_derivative2D(field, axis, device):
         output = F.conv2d(field, weights)
     return output
 
-def angle_and_mag_difference(t1, t2):
+def mag_difference(t1, t2):
     mag_1 = torch.zeros(t1.shape).to(t1.device)
     mag_2 = torch.zeros(t1.shape).to(t1.device)
     for i in range(t1.shape[1]):
@@ -71,7 +71,7 @@ def angle_and_mag_difference(t1, t2):
     mag_1 = torch.sqrt(mag_1[0:, 0:1])
     mag_2 = torch.sqrt(mag_2[0:, 0:1])
     mag_diff = torch.abs(mag_2-mag_1)
-    
+    '''
     t_1 = t1*(1/torch.norm(t1, dim=1).view(1, 1, t1.shape[2], t1.shape[3]).repeat(1, t1.shape[1], 1, 1))
     t_2 = t2*(1/torch.norm(t2, dim=1).view(1, 1, t1.shape[2], t1.shape[3]).repeat(1, t1.shape[1], 1, 1))
     c = (t_1* t_2).sum(dim=1)
@@ -79,7 +79,8 @@ def angle_and_mag_difference(t1, t2):
     angle_diff = torch.acos(c)
     angle_diff[angle_diff != angle_diff] = 0
     angle_diff = angle_diff.unsqueeze(0)    
-    return mag_diff, angle_diff
+    '''
+    return mag_diff
 
 def l2normalize(v, eps=1e-12):
     return v / (v.norm() + eps)
@@ -295,9 +296,9 @@ def train_single_scale(generators, discriminators, opt):
     milestones=[1600],gamma=opt['gamma'])
  
     writer = SummaryWriter(os.path.join('tensorboard',
-    "%.02fsdr_pc=%s_a1=%0.02f_a2=%0.02f_a3=%0.02f_lr=%0.06f_sn=%s" % 
+    "%.02fsdr_pc=%s_a1=%0.02f_a2=%0.02f_a3=%0.02f_a4=%0.02f_lr=%0.06f_sn=%s" % 
     (opt["spatial_downscale_ratio"], opt["physical_constraints"], opt['alpha_1'], opt['alpha_2'], 
-    opt['alpha_3'], opt['learning_rate'], opt["use_spectral_norm"])))
+    opt['alpha_3'], opt['alpha_4'], opt['learning_rate'], opt["use_spectral_norm"])))
 
     start_time = time.time()
     next_save = 0
@@ -373,7 +374,6 @@ def train_single_scale(generators, discriminators, opt):
                 G_loss = output.mean().item()
 
 
-            
             loss = nn.L1Loss().cuda(opt["device"])
             
             # Re-compute the constructed image
@@ -386,14 +386,24 @@ def train_single_scale(generators, discriminators, opt):
             mags = np.zeros(1)
             angles = np.zeros(1)
             if(real.shape[1] > 1):
-                mags, angles = angle_and_mag_difference(optimal_reconstruction, real)
+                cs = torch.nn.CosineSimilarity(dim=1)
+                #mags = mag_difference(optimal_reconstruction, real)
+                mags = torch.abs(torch.norm(optimal_reconstruction, dim=1) - torch.norm(real, dim=1))
+                angles = torch.abs(cs(optimal_reconstruction, real) - 1) / 2
 
             if(opt["physical_constraints"] == "soft"):
                 phys_loss = opt["alpha_3"] * g 
                 phys_loss.backward(retain_graph = True)
-
-            rec_loss = opt["alpha_1"]*loss(optimal_reconstruction, real)
-            rec_loss.backward(retain_graph=True)
+            
+            rec_loss = loss(optimal_reconstruction, real)
+            
+            if(opt['alpha_1'] > 0.0):
+                rec_loss *= opt["alpha_1"]
+                rec_loss.backward(retain_graph=True)
+            if(opt['alpha_4'] > 0.0):
+                cs = torch.nn.CosineSimilarity(dim=1)                
+                r_loss = opt['alpha_4'] * (mags.mean() + angles.mean()) / 2
+                r_loss.backward(retain_graph=True)
             generator_optimizer.step()
 
         if epoch == 0:
@@ -429,11 +439,11 @@ def train_single_scale(generators, discriminators, opt):
                 writer.add_image("fake/%i"%len(generators), 
                 fake_cm, epoch)
             if(real.shape[1] > 1):
-                angles_cm = toImg(((angles.detach().cpu().numpy()[0] / pi)*2)-1)
+                angles_cm = toImg(angles.detach().cpu().numpy())
                 writer.add_image("angle/%i"%len(generators), 
                 angles_cm , epoch)
 
-                mags_cm = toImg(mags.detach().cpu().numpy().reshape([1, real.shape[2], real.shape[3]]))
+                mags_cm = toImg(mags.detach().cpu().numpy())
                 writer.add_image("mag/%i"%len(generators), 
                 mags_cm, epoch)
 
@@ -442,7 +452,7 @@ def train_single_scale(generators, discriminators, opt):
                 g_cm, epoch)
         
         print_to_log_and_console("%i/%i: Dloss=%.02f Gloss=%.02f L1=%.04f TAD=%.02f AMD=%.02f AAD=%.02f" %
-        (epoch, opt['epochs'], D_loss, G_loss, rec_loss/ opt["alpha_1"], g, mags.mean(), angles.mean()), 
+        (epoch, opt['epochs'], D_loss, G_loss, rec_loss, g, mags.mean(), angles.mean()), 
         os.path.join(opt["save_folder"], opt["save_name"]), "log.txt")
 
         writer.add_scalar('D_loss_scale/%i'%len(generators), D_loss, epoch) 
@@ -555,7 +565,9 @@ class SinGAN_Generator(nn.Module):
         else:
             return self.model.parameters()
 
-    def forward(self, data, noise):
+    def forward(self, data, noise=None):
+        if(noise is None):
+            noise = torch.zeros(data.shape).to(self.device)
         noisePlusData = data.clone() + noise
         if(self.pre_padding):
             noisePlusData = F.pad(noisePlusData, self.required_padding)
@@ -666,15 +678,18 @@ class Dataset(torch.utils.data.Dataset):
 
     def unscale(self, data):
         d = data.clone()
-        for i in range(self.num_channels):
-            d[0, i] *= 0.5
-            d[0, i] += 0.5
-            d[0, i] *= (self.channel_maxs[i] - self.channel_mins[i])
-            d[0, i] += self.channel_mins[i]
+        if(self.scale_data):
+            for i in range(self.num_channels):
+                d[0, i] *= 0.5
+                d[0, i] += 0.5
+                d[0, i] *= (self.channel_maxs[i] - self.channel_mins[i])
+                d[0, i] += self.channel_mins[i]
+        elif(self.scale_on_magnitude):
+            data *= self.max_mag
         return d
 
     def __getitem__(self, index):
-        data = np.load(os.path.join(self.dataset_location, str(0) + ".npy"))
+        data = np.load(os.path.join(self.dataset_location, str(index) + ".npy"))
         if(self.image_normalize):
             data = data.astype(np.float32) / 255
             data -= 0.5

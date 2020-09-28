@@ -10,6 +10,8 @@ from typing import Union, Tuple
 from matplotlib.pyplot import cm
 from math import log
 import matplotlib.pyplot as plt
+from skimage.transform.pyramids import pyramid_reduce
+
 
 
 def display_2d(frame):
@@ -37,8 +39,8 @@ save_folder = os.path.join(MVTVSSR_folder_path, "SavedModels")
 
 parser = argparse.ArgumentParser(description='Test a trained model')
 
-parser.add_argument('--load_from',default="Temp")
-parser.add_argument('--data_folder',default="first_sim",type=str,help='File to test on')
+parser.add_argument('--load_from',default="isotropic")
+parser.add_argument('--data_folder',default="JHUturbulence/isotropic1024coarse",type=str,help='File to test on')
 parser.add_argument('--device',default="cuda:0",type=str,help='Frames to use from training file')
 
 args = vars(parser.parse_args())
@@ -55,25 +57,40 @@ for i in range(len(discriminators)):
     discriminators[i].to(args["device"])
     discriminators[i].eval()
 
-dataset = Dataset(os.path.join(input_folder, 'first_sim'), opt)
+dataset = Dataset(os.path.join(input_folder, args["data_folder"]), opt)
+scaling = 4
 
-frame_LR = dataset.__getitem__(0).to(opt['device'])
+frame = dataset.__getitem__(0).to(opt['device'])
+f_np = frame.cpu().numpy()[0]
+max_mag = to_mag(f_np).max()
+imageio.imwrite("GT_HR_mag.png", toImg(to_mag(f_np)).swapaxes(0,2).swapaxes(0,1))
+f_np = pyramid_reduce(f_np.swapaxes(0,2).swapaxes(0,1), 
+        downscale = scaling,
+        multichannel=True).swapaxes(0,1).swapaxes(0,2)
+imageio.imwrite("GT_LR_mag.png", toImg(to_mag(f_np, max_mag = max_mag)).swapaxes(0,2).swapaxes(0,1))
+frame_LR = np2torch(f_np, opt['device']).unsqueeze(0)
+#frame_LR = frame[:,:,::4,::4]
 print(frame_LR.shape)
-print(TAD(dataset.unscale(frame_LR), opt["device"]).sum())
-plt.imshow(toImg(frame_LR.cpu().numpy()[0]).swapaxes(0,2).swapaxes(0,1))
-plt.show()
+#print(TAD(dataset.unscale(frame_LR), opt["device"]).sum())
+#plt.imshow(toImg(frame_LR.cpu().numpy()[0], True).swapaxes(0,2).swapaxes(0,1))
+#plt.show()
 
-scaling = 2
 t = F.interpolate(frame_LR, scale_factor=scaling,mode=opt["upsample_mode"])
-print(TAD(dataset.unscale(t), opt["device"]).sum())
+print(((frame-t)**2).mean())
+#print(TAD(dataset.unscale(t), opt["device"]).sum())
 t = t[0].detach().cpu().numpy()
-plt.imshow(toImg(t).swapaxes(0,2).swapaxes(0,1))
-plt.show()
+imageio.imwrite("Bicubic_mag.png", toImg(to_mag(t, max_mag = max_mag)).swapaxes(0,2).swapaxes(0,1))
+#plt.imshow(toImg(t, True).swapaxes(0,2).swapaxes(0,1))
+#plt.show()
 
 t = super_resolution(generators[-1], frame_LR, scaling, opt, opt["device"])
-print(TAD(dataset.unscale(t), opt["device"]).sum())
-t = torch.clamp(t, -1, 1)[0].detach().cpu().numpy()
-plt.imshow(toImg(t).swapaxes(0,2).swapaxes(0,1))
-plt.show()
+print(((frame-t)**2).mean())
+#t = generators[-1](t)
+#print(((frame-t)**2).mean())
+#print(TAD(dataset.unscale(t), opt["device"]).sum())
+t = t[0].detach().cpu().numpy()
+imageio.imwrite("SinGAN_mag.png", toImg(to_mag(t, max_mag = max_mag)).swapaxes(0,2).swapaxes(0,1))
+#plt.imshow(toImg(t, True).swapaxes(0,2).swapaxes(0,1))
+#plt.show()
 
 
