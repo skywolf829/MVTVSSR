@@ -122,7 +122,7 @@ def init_gen(scale, opt):
 
     generator = SinGAN_Generator(opt["resolutions"][scale], opt["num_blocks"], 
     opt["num_channels"], num_kernels, opt["kernel_size"], opt["stride"], 
-    opt["pre_padding"], opt["mode"], opt["physical_constraints"], scale, opt['separate_chans'],
+    opt["pre_padding"], opt["mode"], opt["physical_constraints"], opt['separate_chans'], scale,
     opt["device"])
 
     weights_init(generator)
@@ -479,7 +479,8 @@ class SinGAN_Generator(nn.Module):
         self.pre_padding = pre_padding
         self.resolution = resolution
         self.num_channels = num_channels
-        if(scale == 0):
+        print(self.scale)
+        if(self.scale == 0):
             self.optimal_noise = torch.randn(self.get_input_shape(), device=device)
         else:
             self.optimal_noise = torch.zeros(self.get_input_shape(), device=device)
