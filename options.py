@@ -14,12 +14,12 @@ class Options():
         opt["save_name"]               = "Temp"    # Folder that the model will be saved to
         opt["num_channels"]            = 3
         opt["spatial_downscale_ratio"] = 0.75       # Spatial downscale ratio between levels
-        opt["min_dimension_size"]      = 32        # Smallest a dimension can go as the smallest level
+        opt["min_dimension_size"]      = 25        # Smallest a dimension can go as the smallest level
         opt["train_date_time"]         = None      # The day/time the model was trained (finish time)
         
         # GAN info
         opt["num_blocks"]              = 5
-        opt["base_num_kernels"]        = 16        # Num of kernels in smallest scale conv layers
+        opt["base_num_kernels"]        = 32        # Num of kernels in smallest scale conv layers
         opt["pre_padding"]             = False         # Padding on conv layers in the GAN
         opt["kernel_size"]             = 3
         opt["stride"]                  = 1
@@ -46,7 +46,7 @@ class Options():
         opt["alpha_1"]                 = 0       # Reconstruction loss coefficient
         opt["alpha_2"]                 = 1        # Adversarial loss coefficient
         opt["alpha_3"]                 = 0        # Soft physical loss coefficient
-        opt["alpha_4"]                 = 100          # mag_and_angle loss
+        opt["alpha_4"]                 = 1          # mag_and_angle loss
         opt["generator_steps"]         = 3
         opt["discriminator_steps"]     = 3
         opt["epochs"]                  = 2000
