@@ -316,7 +316,9 @@ def train_single_scale(generators, discriminators, opt):
         downscale = (1 / opt["spatial_downscale_ratio"])**(len(opt["resolutions"]) - len(generators)-1),
         multichannel=True).swapaxes(0,1).swapaxes(0,2)
         real = np2torch(real, device=opt["device"]).unsqueeze(0)
-    
+    print("Real")
+    print(real.max())
+    print(real.min())
 
     optimal_LR = torch.zeros(generator.get_input_shape(), device=opt["device"])
     opt["noise_amplitudes"].append(1.0)
@@ -379,6 +381,7 @@ def train_single_scale(generators, discriminators, opt):
             # Re-compute the constructed image
             optimal_reconstruction = generator(optimal_LR.detach().clone(), 
             opt["noise_amplitudes"][-1]*generator.optimal_noise)
+            
             g = 0
             if(real.shape[1] > 1):
                 g_map = TAD(dataset.unscale(optimal_reconstruction), opt["device"])            
@@ -394,7 +397,9 @@ def train_single_scale(generators, discriminators, opt):
             if(opt["physical_constraints"] == "soft"):
                 phys_loss = opt["alpha_3"] * g 
                 phys_loss.backward(retain_graph = True)
-            
+            print("rec")
+            print(optimal_reconstruction.max())
+            print(optimal_reconstruction.min())
             rec_loss = loss(optimal_reconstruction, real)
             
             if(opt['alpha_1'] > 0.0):
@@ -402,7 +407,7 @@ def train_single_scale(generators, discriminators, opt):
                 rec_loss.backward(retain_graph=True)
             if(opt['alpha_4'] > 0.0):
                 cs = torch.nn.CosineSimilarity(dim=1)                
-                r_loss = opt['alpha_4'] * (mags.mean() + angles.mean()) / 2
+                r_loss = opt['alpha_4'] * (mags.sum() + angles.sum()) / 2
                 r_loss.backward(retain_graph=True)
             generator_optimizer.step()
 
@@ -415,11 +420,6 @@ def train_single_scale(generators, discriminators, opt):
             real_cm = toImg(real_numpy)
             writer.add_image("real/%i"%len(generators), 
             real_cm, epoch)
-
-            writer.add_image("realx/%i"%len(generators), 
-            toImg(real_numpy[0:1]), epoch)
-            writer.add_image("realy/%i"%len(generators), 
-            toImg(real_numpy[1:2]), epoch)
 
             
 
@@ -448,12 +448,14 @@ def train_single_scale(generators, discriminators, opt):
                 g_cm, epoch)
         
         print_to_log_and_console("%i/%i: Dloss=%.02f Gloss=%.02f L1=%.04f TAD=%.02f AMD=%.02f AAD=%.02f" %
-        (epoch, opt['epochs'], D_loss, G_loss, rec_loss, g, mags.mean(), angles.mean()), 
+        (epoch, opt['epochs'], D_loss, G_loss, rec_loss, g, mags.sum(), angles.sum()), 
         os.path.join(opt["save_folder"], opt["save_name"]), "log.txt")
 
         writer.add_scalar('D_loss_scale/%i'%len(generators), D_loss, epoch) 
         writer.add_scalar('G_loss_scale/%i'%len(generators), G_loss, epoch) 
-        writer.add_scalar('L1/%i'%len(generators), rec_loss, epoch) 
+        writer.add_scalar('L1/%i'%len(generators), rec_loss, epoch)
+        writer.add_scalar('Rec_min/%i'%len(generators), optimal_reconstruction.min())
+        writer.add_scalar('Rec_max/%i'%len(generators), optimal_reconstruction.max())
         writer.add_scalar('TAD_scale/%i'%len(generators), g, epoch)
         writer.add_scalar('Mag_loss_scale/%i'%len(generators), mags.mean(), epoch) 
         writer.add_scalar('Angle_loss_scale/%i'%len(generators), angles.mean(), epoch) 

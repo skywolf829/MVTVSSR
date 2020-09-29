@@ -61,13 +61,34 @@ dataset = Dataset(os.path.join(input_folder, args["data_folder"]), opt)
 scaling = 4
 
 frame = dataset.__getitem__(0).to(opt['device'])
-f_np = frame.cpu().numpy()[0]
+print(frame.min())
+print(frame.max())
+f_mag = torch.norm(frame, dim=1).detach().cpu().numpy()
+f_np = frame[0].detach().cpu().numpy()
 
-imageio.imwrite("GT_HR_mag.png", toImg(to_mag(f_np)).swapaxes(0,2).swapaxes(0,1))
+plt.hist(f_np[0].flatten(), 50, histtype='step', stacked=True, fill=False, color='blue')
+plt.hist(f_np[1].flatten(), 50, histtype='step', stacked=True, fill=False, color='green')
+plt.hist(f_np[2].flatten(), 50, histtype='step', stacked=True, fill=False, color='orange')
+plt.legend(['u', 'v', 'w'])
+plt.title('data distribution - GT')
+plt.show()
+imageio.imwrite("GT_HR_mag.png", toImg(f_mag).swapaxes(0,2).swapaxes(0,1))
+
 imageio.imwrite("GT_HR_uvw.png", toImg(f_np).swapaxes(0,2).swapaxes(0,1))
-f_singan = generate(generators, "reconstruct", opt, opt['device'])[0].detach().cpu().numpy()
 
-imageio.imwrite("GT_singan_mag.png", toImg(to_mag(f_singan)).swapaxes(0,2).swapaxes(0,1))
+f_singan = generate(generators, "reconstruct", opt, opt['device'])
+print(f_singan.min())
+print(f_singan.max())
+
+f_singan_mag = torch.norm(f_singan, dim=1).detach().cpu().numpy()
+f_singan = f_singan[0].detach().cpu().numpy()
+plt.hist(f_singan[0].flatten(), 50, histtype='step', stacked=True, fill=False, color='blue')
+plt.hist(f_singan[1].flatten(), 50, histtype='step', stacked=True, fill=False, color='green')
+plt.hist(f_singan[2].flatten(), 50, histtype='step', stacked=True, fill=False, color='orange')
+plt.legend(['u', 'v', 'w'])
+plt.title('data distribution - %s' % args["load_from"])
+plt.show()
+imageio.imwrite("GT_singan_mag.png", toImg(f_singan_mag).swapaxes(0,2).swapaxes(0,1))
 imageio.imwrite("GT_singan_uvw.png", toImg(f_singan).swapaxes(0,2).swapaxes(0,1))
 
 '''
