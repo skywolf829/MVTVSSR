@@ -428,10 +428,6 @@ def train_single_scale(generators, discriminators, opt):
             rec_cm = toImg(rec_numpy)
             writer.add_image("reconstructed/%i"%len(generators), 
             rec_cm, epoch)
-            writer.add_image("reconstructedx/%i"%len(generators), 
-            toImg(rec_numpy[0:1]), epoch)
-            writer.add_image("reconstructedy/%i"%len(generators), 
-            toImg(rec_numpy[1:2]), epoch)
 
             if(opt["alpha_2"] > 0.0):
                 fake_numpy = fake.clone().detach().cpu().numpy()[0]
@@ -480,10 +476,10 @@ class SinGAN_Generator(nn.Module):
         self.resolution = resolution
         self.num_channels = num_channels
         print(self.scale)
-        if(self.scale == 0):
-            self.optimal_noise = torch.randn(self.get_input_shape(), device=device)
-        else:
-            self.optimal_noise = torch.zeros(self.get_input_shape(), device=device)
+        #if(self.scale == 0):
+        self.optimal_noise = torch.randn(self.get_input_shape(), device=device)
+        #else:
+        #    self.optimal_noise = torch.zeros(self.get_input_shape(), device=device)
         self.physical_constraints = physical_constraints
         self.device = device
         self.separate_chans = separate_chans

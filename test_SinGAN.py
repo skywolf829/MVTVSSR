@@ -39,7 +39,7 @@ save_folder = os.path.join(MVTVSSR_folder_path, "SavedModels")
 
 parser = argparse.ArgumentParser(description='Test a trained model')
 
-parser.add_argument('--load_from',default="isotropic512_L1")
+parser.add_argument('--load_from',default="isotropic512_magangle")
 parser.add_argument('--data_folder',default="JHUturbulence/isotropic512coarse",type=str,help='File to test on')
 parser.add_argument('--device',default="cuda:0",type=str,help='Frames to use from training file')
 
@@ -64,9 +64,12 @@ frame = dataset.__getitem__(0).to(opt['device'])
 f_np = frame.cpu().numpy()[0]
 
 imageio.imwrite("GT_HR_mag.png", toImg(to_mag(f_np)).swapaxes(0,2).swapaxes(0,1))
+imageio.imwrite("GT_HR_uvw.png", toImg(f_np).swapaxes(0,2).swapaxes(0,1))
 f_singan = generate(generators, "reconstruct", opt, opt['device'])[0].detach().cpu().numpy()
 
 imageio.imwrite("GT_singan_mag.png", toImg(to_mag(f_singan)).swapaxes(0,2).swapaxes(0,1))
+imageio.imwrite("GT_singan_uvw.png", toImg(f_singan).swapaxes(0,2).swapaxes(0,1))
+
 '''
 max_mag = to_mag(f_np).max()
 imageio.imwrite("GT_HR_mag.png", toImg(to_mag(f_np)).swapaxes(0,2).swapaxes(0,1))
