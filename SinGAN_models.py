@@ -685,7 +685,7 @@ class Dataset(torch.utils.data.Dataset):
                 d[0, i] *= (self.channel_maxs[i] - self.channel_mins[i])
                 d[0, i] += self.channel_mins[i]
         elif(self.scale_on_magnitude):
-            data *= self.max_mag
+            d *= self.max_mag
         return d
 
     def __getitem__(self, index):

@@ -52,14 +52,14 @@ generators, discriminators = load_models(opt,args["device"])
 
 for i in range(len(generators)):
     generators[i] = generators[i].to(args["device"])
-    generators[i] = generators[i].eval()
+    #generators[i] = generators[i].eval()
 for i in range(len(discriminators)):
     discriminators[i].to(args["device"])
-    discriminators[i].eval()
+    #discriminators[i].eval()
 
 dataset = Dataset(os.path.join(input_folder, args["data_folder"]), opt)
 scaling = 4
-
+print(dataset.max_mag)
 frame = dataset.__getitem__(0).to(opt['device'])
 print(frame.min())
 print(frame.max())
@@ -76,7 +76,7 @@ imageio.imwrite("GT_HR_mag.png", toImg(f_mag).swapaxes(0,2).swapaxes(0,1))
 
 imageio.imwrite("GT_HR_uvw.png", toImg(f_np).swapaxes(0,2).swapaxes(0,1))
 
-f_singan = generate(generators, "reconstruct", opt, opt['device'])
+f_singan = generate(generators[0:1], "random", opt, opt["device"])
 print(f_singan.min())
 print(f_singan.max())
 
