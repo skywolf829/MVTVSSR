@@ -397,9 +397,6 @@ def train_single_scale(generators, discriminators, opt):
             if(opt["physical_constraints"] == "soft"):
                 phys_loss = opt["alpha_3"] * g 
                 phys_loss.backward(retain_graph = True)
-            print("rec")
-            print(optimal_reconstruction.max())
-            print(optimal_reconstruction.min())
             rec_loss = loss(optimal_reconstruction, real)
             
             if(opt['alpha_1'] > 0.0):

@@ -22,6 +22,8 @@ output_folder = os.path.join(MVTVSSR_folder_path, "Output")
 save_folder = os.path.join(MVTVSSR_folder_path, "SavedModels")
 
 a = np.load(os.path.join(input_folder, "JHUturbulence", "isotropic1024coarse", "0.npy"))
+np.save(os.path.join(input_folder, "JHUturbulence", "isotropic128coarse", "0.npy"), a[:,::8,::8])
+'''
 print(a.shape)
 print(a[0].max())
 print(a[0].min())
@@ -83,3 +85,4 @@ plt.hist(d[2].flatten(), 50, histtype='step', stacked=True, fill=False, color='o
 plt.legend(['u', 'v', 'w'])
 plt.title('data distribution - magnitude scaled with mean shift')
 plt.show()
+'''
