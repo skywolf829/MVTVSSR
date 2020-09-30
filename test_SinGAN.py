@@ -58,11 +58,9 @@ for i in range(len(discriminators)):
     #discriminators[i].eval()
 
 dataset = Dataset(os.path.join(input_folder, args["data_folder"]), opt)
-scaling = 4
-print(dataset.max_mag)
+
 frame = dataset.__getitem__(0).to(opt['device'])
-print(frame.min())
-print(frame.max())
+f_LR = frame.clone()
 f_mag = torch.norm(frame, dim=1).detach().cpu().numpy()
 f_np = frame[0].detach().cpu().numpy()
 
@@ -72,14 +70,10 @@ plt.hist(f_np[2].flatten(), 50, histtype='step', stacked=True, fill=False, color
 plt.legend(['u', 'v', 'w'])
 plt.title('data distribution - GT')
 plt.show()
-imageio.imwrite("GT_HR_mag.png", toImg(f_mag).swapaxes(0,2).swapaxes(0,1))
+imageio.imwrite("GT_LR_mag.png", toImg(f_mag).swapaxes(0,2).swapaxes(0,1))
+imageio.imwrite("GT_LR_uvw.png", toImg(f_np).swapaxes(0,2).swapaxes(0,1))
 
-imageio.imwrite("GT_HR_uvw.png", toImg(f_np).swapaxes(0,2).swapaxes(0,1))
-
-f_singan = generate(generators[0:1], "random", opt, opt["device"])
-print(f_singan.min())
-print(f_singan.max())
-
+f_singan = generate(generators, "reconstruct", opt, opt["device"])
 f_singan_mag = torch.norm(f_singan, dim=1).detach().cpu().numpy()
 f_singan = f_singan[0].detach().cpu().numpy()
 plt.hist(f_singan[0].flatten(), 50, histtype='step', stacked=True, fill=False, color='blue')
@@ -88,15 +82,32 @@ plt.hist(f_singan[2].flatten(), 50, histtype='step', stacked=True, fill=False, c
 plt.legend(['u', 'v', 'w'])
 plt.title('data distribution - %s' % args["load_from"])
 plt.show()
-imageio.imwrite("GT_singan_mag.png", toImg(f_singan_mag).swapaxes(0,2).swapaxes(0,1))
-imageio.imwrite("GT_singan_uvw.png", toImg(f_singan).swapaxes(0,2).swapaxes(0,1))
+imageio.imwrite("LR_singan_mag.png", toImg(f_singan_mag).swapaxes(0,2).swapaxes(0,1))
+imageio.imwrite("LR_singan_uvw.png", toImg(f_singan).swapaxes(0,2).swapaxes(0,1))
 
+scaling = 4
+dataset = Dataset(os.path.join(input_folder, "JHUturbulence", "isotropic512coarse"), opt)
+frame = dataset.__getitem__(0).to(opt['device'])
+f_mag = torch.norm(frame, dim=1).detach().cpu().numpy()
+f_np = frame[0].detach().cpu().numpy()
+imageio.imwrite("GT_HR_mag.png", toImg(f_mag).swapaxes(0,2).swapaxes(0,1))
+imageio.imwrite("GT_HR_uvw.png", toImg(f_np).swapaxes(0,2).swapaxes(0,1))
+
+bicubic = F.interpolate(f_LR, scale_factor=scaling,mode=opt["upsample_mode"])
+bicubic_mag = torch.norm(bicubic, dim=1).detach().cpu().numpy()
+bicubic_np = bicubic[0].detach().cpu().numpy()
+imageio.imwrite("bicub_HR_mag.png", toImg(bicubic_mag).swapaxes(0,2).swapaxes(0,1))
+imageio.imwrite("bicub_HR_uvw.png", toImg(bicubic_np).swapaxes(0,2).swapaxes(0,1))
+
+singan = super_resolution(generators[-1], f_LR, scaling, opt, opt['device'])
+singan_mag = torch.norm(singan, dim=1).detach().cpu().numpy()
+singan_np = singan[0].detach().cpu().numpy()
+imageio.imwrite("singan_HR_mag.png", toImg(singan_mag).swapaxes(0,2).swapaxes(0,1))
+imageio.imwrite("singan_HR_uvw.png", toImg(singan_np).swapaxes(0,2).swapaxes(0,1))
 '''
-max_mag = to_mag(f_np).max()
-imageio.imwrite("GT_HR_mag.png", toImg(to_mag(f_np)).swapaxes(0,2).swapaxes(0,1))
-f_np = pyramid_reduce(f_np.swapaxes(0,2).swapaxes(0,1), 
-        downscale = scaling,
-        multichannel=True).swapaxes(0,1).swapaxes(0,2)
+#f_np = pyramid_reduce(f_np.swapaxes(0,2).swapaxes(0,1), 
+#        downscale = scaling,
+#        multichannel=True).swapaxes(0,1).swapaxes(0,2)
 imageio.imwrite("GT_LR_mag.png", toImg(to_mag(f_np, max_mag = max_mag)).swapaxes(0,2).swapaxes(0,1))
 frame_LR = np2torch(f_np, opt['device']).unsqueeze(0)
 #frame_LR = frame[:,:,::4,::4]

@@ -165,17 +165,14 @@ def super_resolution(generator, frame, factor, opt, device):
     r = 1 / opt["spatial_downscale_ratio"]
     curr_r = 1.0
     while(curr_r * r < factor):
-        print(frame.shape)
         frame = F.interpolate(frame, scale_factor=r,mode=opt["upsample_mode"])
         noise = torch.randn(frame.shape).to(device)
-        noise = torch.zeros(frame.shape).to(device)
         frame = generator(frame, opt["noise_amplitudes"][-1]*noise)
         curr_r *= r
     frame = F.interpolate(frame, size=full_size, mode=opt["upsample_mode"])
     noise = torch.randn(frame.shape).to(device)
     noise = torch.zeros(frame.shape).to(device)
     frame = generator(frame, opt["noise_amplitudes"][-1]*noise)
-    print(frame.shape)
     return frame
 
 def save_models(generators, discriminators, opt):
