@@ -472,10 +472,10 @@ class SinGAN_Generator(nn.Module):
         self.resolution = resolution
         self.num_channels = num_channels
         print(self.scale)
-        #if(self.scale == 0):
-        self.optimal_noise = torch.randn(self.get_input_shape(), device=device)
-        #else:
-        #    self.optimal_noise = torch.zeros(self.get_input_shape(), device=device)
+        if(self.scale == 0):
+            self.optimal_noise = torch.randn(self.get_input_shape(), device=device)
+        else:
+            self.optimal_noise = torch.zeros(self.get_input_shape(), device=device)
         self.physical_constraints = physical_constraints
         self.device = device
         self.separate_chans = separate_chans

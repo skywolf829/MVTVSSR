@@ -39,8 +39,8 @@ save_folder = os.path.join(MVTVSSR_folder_path, "SavedModels")
 
 parser = argparse.ArgumentParser(description='Test a trained model')
 
-parser.add_argument('--load_from',default="magang_128")
-parser.add_argument('--data_folder',default="JHUturbulence/isotropic128coarse",type=str,help='File to test on')
+parser.add_argument('--load_from',default="L1_512")
+parser.add_argument('--data_folder',default="JHUturbulence/isotropic1024coarse",type=str,help='File to test on')
 parser.add_argument('--device',default="cuda:0",type=str,help='Frames to use from training file')
 
 args = vars(parser.parse_args())
@@ -52,10 +52,13 @@ generators, discriminators = load_models(opt,args["device"])
 
 for i in range(len(generators)):
     generators[i] = generators[i].to(args["device"])
-    #generators[i] = generators[i].eval()
+    generators[i] = generators[i].eval()
 for i in range(len(discriminators)):
     discriminators[i].to(args["device"])
-    #discriminators[i].eval()
+    discriminators[i].eval()
+
+'''
+# Zero shot super resolution
 
 dataset = Dataset(os.path.join(input_folder, args["data_folder"]), opt)
 
@@ -98,41 +101,90 @@ bicubic_mag = torch.norm(bicubic, dim=1).detach().cpu().numpy()
 bicubic_np = bicubic[0].detach().cpu().numpy()
 imageio.imwrite("bicub_HR_mag.png", toImg(bicubic_mag).swapaxes(0,2).swapaxes(0,1))
 imageio.imwrite("bicub_HR_uvw.png", toImg(bicubic_np).swapaxes(0,2).swapaxes(0,1))
+total_err = (abs(bicubic - frame)).sum()
+mse = ((bicubic - frame)**2).mean()
 
+print("Total err bicubic %0.02f" % total_err)
+print("MSE bicubic %0.02f" % mse)
 singan = super_resolution(generators[-1], f_LR, scaling, opt, opt['device'])
 singan_mag = torch.norm(singan, dim=1).detach().cpu().numpy()
 singan_np = singan[0].detach().cpu().numpy()
 imageio.imwrite("singan_HR_mag.png", toImg(singan_mag).swapaxes(0,2).swapaxes(0,1))
 imageio.imwrite("singan_HR_uvw.png", toImg(singan_np).swapaxes(0,2).swapaxes(0,1))
+total_err = (abs(singan - frame)).sum()
+mse = ((singan - frame)**2).mean()
+
+print("Total err singan %0.02f" % total_err)
+print("MSE singan %0.02f" % mse)
 '''
-#f_np = pyramid_reduce(f_np.swapaxes(0,2).swapaxes(0,1), 
-#        downscale = scaling,
-#        multichannel=True).swapaxes(0,1).swapaxes(0,2)
-imageio.imwrite("GT_LR_mag.png", toImg(to_mag(f_np, max_mag = max_mag)).swapaxes(0,2).swapaxes(0,1))
-frame_LR = np2torch(f_np, opt['device']).unsqueeze(0)
-#frame_LR = frame[:,:,::4,::4]
-print(frame_LR.shape)
-#print(TAD(dataset.unscale(frame_LR), opt["device"]).sum())
-#plt.imshow(toImg(frame_LR.cpu().numpy()[0], True).swapaxes(0,2).swapaxes(0,1))
-#plt.show()
-
-t = F.interpolate(frame_LR, scale_factor=scaling,mode=opt["upsample_mode"])
-print(((frame-t)**2).mean())
-#print(TAD(dataset.unscale(t), opt["device"]).sum())
-t = t[0].detach().cpu().numpy()
-imageio.imwrite("Bicubic_mag.png", toImg(to_mag(t, max_mag = max_mag)).swapaxes(0,2).swapaxes(0,1))
-#plt.imshow(toImg(t, True).swapaxes(0,2).swapaxes(0,1))
-#plt.show()
-
-t = super_resolution(generators[-1], frame_LR, scaling, opt, opt["device"])
-print(((frame-t)**2).mean())
-#t = generators[-1](t)
-#print(((frame-t)**2).mean())
-#print(TAD(dataset.unscale(t), opt["device"]).sum())
-t = t[0].detach().cpu().numpy()
-imageio.imwrite("SinGAN_mag.png", toImg(to_mag(t, max_mag = max_mag)).swapaxes(0,2).swapaxes(0,1))
-#plt.imshow(toImg(t, True).swapaxes(0,2).swapaxes(0,1))
-#plt.show()
 
 
-'''
+# One shot super resolution
+dataset = Dataset(os.path.join(input_folder, args["data_folder"]), opt)
+
+
+GT_frames = []
+gt_mag = []
+bicub_frames = []
+bicub_mag = []
+singan_frames = []
+singan_mag = []
+
+bicub_err = []
+singan_err = []
+print(len(dataset))
+
+gen_to_use = 5
+lr = opt['resolutions'][gen_to_use]
+
+for i in range(len(dataset)):
+    print(i)
+    f = dataset.__getitem__(i)
+    f_lr = pyramid_reduce(f[0].clone().cpu().numpy().swapaxes(0,2).swapaxes(0,1), 
+        downscale = f.shape[2] / lr[0],
+        multichannel=True).swapaxes(0,1).swapaxes(0,2)
+    f_lr = np2torch(f_lr, opt['device']).unsqueeze(0).to(opt['device'])
+    f_hr = f.clone()[:,:,::2,::2].to(opt['device'])
+    g_mag = torch.norm(f_hr, dim=1).detach().cpu().numpy()
+    GT_frames.append(toImg(f_hr.clone()[0].detach().cpu().numpy()).swapaxes(0,2).swapaxes(0,1))
+    gt_mag.append(toImg(g_mag).swapaxes(0,2).swapaxes(0,1))
+
+    bicub = F.interpolate(f_lr.clone(), size=opt['resolutions'][-1],mode=opt["upsample_mode"])
+    b_mag = torch.norm(bicub, dim=1).detach().cpu().numpy()
+    bicub_frames.append(toImg(bicub.clone().detach().cpu().numpy()[0]).swapaxes(0,2).swapaxes(0,1))
+    bicub_err.append(abs(bicub-f_hr).sum())
+    bicub_mag.append(toImg(b_mag).swapaxes(0,2).swapaxes(0,1))
+
+
+    generated = f_lr.clone()
+    for j in range(gen_to_use+1, len(generators)):
+        with torch.no_grad():
+            generated = F.interpolate(generated, size=opt['resolutions'][j],mode=opt["upsample_mode"]).detach()
+            generated = generators[j](generated, 
+            torch.randn(generators[j].get_input_shape()).to(opt["device"]) * opt['noise_amplitudes'][j])
+            #generators[j].optimal_noise * opt['noise_amplitudes'][j])
+    s_mag = torch.norm(generated, dim=1).detach().cpu().numpy()
+    singan_frames.append(toImg(generated.detach().cpu().numpy()[0]).swapaxes(0,2).swapaxes(0,1))
+    singan_err.append(abs(generated-f_hr).sum())
+    singan_mag.append(toImg(s_mag).swapaxes(0,2).swapaxes(0,1))
+
+imageio.mimwrite("singan.gif", singan_frames)
+imageio.mimwrite("singan_mag.gif", singan_mag)
+imageio.mimwrite("GT.gif", GT_frames)
+imageio.mimwrite("gt_mag.gif", gt_mag)
+imageio.mimwrite("bicub.gif", bicub_frames)
+imageio.mimwrite("bicub_mag.gif", bicub_mag)
+
+imageio.imwrite("singan_last_frame_zoom.png", singan_frames[-1][100:200, 100:200, :])
+imageio.imwrite("singan_last_frame_mag_zoom.png", singan_mag[-1][100:200, 100:200, :])
+imageio.imwrite("bicub_last_frame_zoom.png", bicub_frames[-1][100:200, 100:200, :])
+imageio.imwrite("bicub_last_frame_mag_zoom.png", bicub_mag[-1][100:200, 100:200, :])
+imageio.imwrite("gt_last_frame_zoom.png", GT_frames[-1][100:200, 100:200, :])
+imageio.imwrite("gt_last_frame_mag_zoom.png", gt_mag[-1][100:200, 100:200, :])
+
+
+plt.plot(np.arange(0, len(singan_err)), singan_err, color='red')
+plt.plot(np.arange(0, len(singan_err)), bicub_err, color='blue')
+plt.legend(['SinGAN', 'Bicubic'])
+plt.title('Absolute error per frame')
+plt.show()
