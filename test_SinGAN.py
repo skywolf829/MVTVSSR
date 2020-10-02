@@ -131,7 +131,9 @@ singan_frames = []
 singan_mag = []
 
 bicub_err = []
+bicub_psnr = []
 singan_err = []
+singan_psnr = []
 print(len(dataset))
 
 gen_to_use = 5
@@ -139,7 +141,8 @@ lr = opt['resolutions'][gen_to_use]
 
 for i in range(len(dataset)):
     print(i)
-    f = dataset.__getitem__(i)
+    f = dataset.__getitem__(i).to(opt['device'])
+    print(TAD(dataset.unscale(f), opt['device']).sum())
     f_lr = pyramid_reduce(f[0].clone().cpu().numpy().swapaxes(0,2).swapaxes(0,1), 
         downscale = f.shape[2] / lr[0],
         multichannel=True).swapaxes(0,1).swapaxes(0,2)
@@ -153,6 +156,7 @@ for i in range(len(dataset)):
     b_mag = torch.norm(bicub, dim=1).detach().cpu().numpy()
     bicub_frames.append(toImg(bicub.clone().detach().cpu().numpy()[0]).swapaxes(0,2).swapaxes(0,1))
     bicub_err.append(abs(bicub-f_hr).sum())
+    bicub_psnr.append(PSNR(f_hr.clone(), bicub, max_val=(f_hr.max()-f_hr.min())))
     bicub_mag.append(toImg(b_mag).swapaxes(0,2).swapaxes(0,1))
 
 
@@ -161,11 +165,12 @@ for i in range(len(dataset)):
         with torch.no_grad():
             generated = F.interpolate(generated, size=opt['resolutions'][j],mode=opt["upsample_mode"]).detach()
             generated = generators[j](generated, 
-            torch.randn(generators[j].get_input_shape()).to(opt["device"]) * opt['noise_amplitudes'][j])
-            #generators[j].optimal_noise * opt['noise_amplitudes'][j])
+            #torch.randn(generators[j].get_input_shape()).to(opt["device"]) * opt['noise_amplitudes'][j])
+            generators[j].optimal_noise * opt['noise_amplitudes'][j])
     s_mag = torch.norm(generated, dim=1).detach().cpu().numpy()
     singan_frames.append(toImg(generated.detach().cpu().numpy()[0]).swapaxes(0,2).swapaxes(0,1))
     singan_err.append(abs(generated-f_hr).sum())
+    singan_psnr.append(PSNR(f_hr.clone(), generated, max_val=(f_hr.max()-f_hr.min())))
     singan_mag.append(toImg(s_mag).swapaxes(0,2).swapaxes(0,1))
 
 imageio.mimwrite("singan.gif", singan_frames)
@@ -187,4 +192,11 @@ plt.plot(np.arange(0, len(singan_err)), singan_err, color='red')
 plt.plot(np.arange(0, len(singan_err)), bicub_err, color='blue')
 plt.legend(['SinGAN', 'Bicubic'])
 plt.title('Absolute error per frame')
+plt.show()
+
+
+plt.plot(np.arange(0, len(singan_psnr)), singan_psnr, color='red')
+plt.plot(np.arange(0, len(singan_psnr)), bicub_psnr, color='blue')
+plt.legend(['SinGAN', 'Bicubic'])
+plt.title('PSNR per frame')
 plt.show()

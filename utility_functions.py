@@ -70,7 +70,7 @@ def MSE(x, y):
     return _mse
 
 def PSNR(GT,fake,max_val=255): 
-    sqrtmse = np.mean((GT - fake) ** 2) ** 0.5
+    sqrtmse = ((GT - fake) ** 2).mean() ** 0.5
     return 20 * log10(max_val / sqrtmse)
 
 def SSIM(GT,fake,multichannel=True):

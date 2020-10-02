@@ -42,23 +42,69 @@ def reset_grads(model,require_grad):
     return model
 
 def TAD(field, device):
-    tx = spatial_derivative2D(field[:,0:1,:,:], "x", device)
-    ty = spatial_derivative2D(field[:,1:2,:,:], "y", device)
-    g = torch.abs(tx + ty)
+    if(field.shape[1] == 2):
+        tx = spatial_derivative2D(field[:,0:1,:,:], 0, device)
+        ty = spatial_derivative2D(field[:,1:2,:,:], 1, device)
+        g = torch.abs(tx + ty)
+    elif(field.shape[1] == 3):
+        tx = spatial_derivative2D(field[:,0:1,:,:], 0, device)
+        ty = spatial_derivative2D(field[:,1:2,:,:], 1, device)
+        #tz = spatial_derivative2D(field[:,2:3,:,:], 2, device)
+        g = torch.abs(tx + ty)
     return g
 
 def spatial_derivative2D(field, axis, device):
     m = nn.ReplicationPad2d(1)
-    if(axis == "x"):
-        weights = torch.tensor(np.array([[0, 0, 0], [-1/2, 0, 1/2], [0, 0, 0]]).astype(np.float32)).to(device)
+    if(axis == 0):
+        weights = torch.tensor(
+            np.array([
+            [-1/8, 0, 1/8], 
+            [-1/4, 0, 1/4],
+            [-1/8, 0, 1/8]
+            ]
+        ).astype(np.float32)).to(device)
         weights = weights.view(1, 1, 3, 3)
         field = m(field)
         output = F.conv2d(field, weights)
+    elif(axis == 1):
+        weights = torch.tensor(
+            np.array([
+            [-1/8, -1/4, -1/8], 
+            [   0,    0,    0], 
+            [ 1/8,  1/4,  1/8]
+            ]
+        ).astype(np.float32)).to(device)
+        weights = weights.view(1, 1, 3, 3)
+        field = m(field)
+        output = F.conv2d(field, weights)
+    return output
+
+def spatial_derivative3D(field, axis, device):
+    m = nn.ReplicationPad3d(1)
+    if(axis == "z"):
+        weights = torch.tensor(np.array([
+            [[-1/16, -2/16, -1/16], [0, 0, 0], [1/16, 2/16, 1/16]],
+            [[-2/16, -4/16, -2/16], [0, 0, 0], [2/16, 4/16, 2/16]],
+            [[-1/16, -2/16, -1/16], [0, 0, 0], [1/16, 2/16, 1/16]]]
+            )
+            .astype(np.float32)).to(device)
+    elif(axis == "x"):
+        weights = torch.tensor(np.array([
+            [[-1/16, 0, 1/16], [-2/16, 0, 2/16], [-1/16, 0, 1/16]],
+            [[-2/16, 0, 2/16], [-4/16, 0, 4/16], [-2/16, 0, 2/16]],
+            [[-1/16, 0, 1/16], [-2/16, 0, 2/16], [-1/16, 0, 1/16]]]
+            )
+            .astype(np.float32)).to(device)
     elif(axis == "y"):
-        weights = torch.tensor(np.array([[0, -1/2, 0], [0, 0, 0], [0, 1/2, 0]]).astype(np.float32)).to(device)
-        weights = weights.view(1, 1, 3, 3)
-        field = m(field)
-        output = F.conv2d(field, weights)
+        weights = torch.tensor(np.array([
+            [[-1/16, -2/16, -1/16], [-2/16, -4/16, -2/16], [-1/16, -2/16, -1/16]],
+            [[    0,     0,     0], [    0,     0,     0], [    0,     0,     0]],
+            [[ 1/16,  2/16,  1/16], [ 2/16,  4/16,  2/16], [ 1/16,  2/16,  1/16]]]
+            )
+            .astype(np.float32)).to(device)
+    weights = weights.view(1, 1, 3, 3, 3)
+    field = m(field)
+    output = F.conv3d(field, weights)
     return output
 
 def mag_difference(t1, t2):
@@ -293,9 +339,9 @@ def train_single_scale(generators, discriminators, opt):
     milestones=[1600],gamma=opt['gamma'])
  
     writer = SummaryWriter(os.path.join('tensorboard',
-    "%.02fsdr_pc=%s_a1=%0.02f_a2=%0.02f_a3=%0.02f_a4=%0.02f_lr=%0.06f_sn=%s" % 
+    "%.02fsdr_pc%s_a1%0.02f_a2%0.02f_a3%0.02f_a4%0.02f_a5%0.2f" % 
     (opt["spatial_downscale_ratio"], opt["physical_constraints"], opt['alpha_1'], opt['alpha_2'], 
-    opt['alpha_3'], opt['alpha_4'], opt['learning_rate'], opt["use_spectral_norm"])))
+    opt['alpha_3'], opt['alpha_4'], opt["alpha_5"])))
 
     start_time = time.time()
     next_save = 0
@@ -339,6 +385,8 @@ def train_single_scale(generators, discriminators, opt):
         
         D_loss = 0
         G_loss = 0
+        
+        gradient_loss = 0
         
         # Update discriminator: maximize D(x) + D(G(z))
         if(opt["alpha_2"] > 0.0):            
@@ -390,6 +438,17 @@ def train_single_scale(generators, discriminators, opt):
                 #mags = mag_difference(optimal_reconstruction, real)
                 mags = torch.abs(torch.norm(optimal_reconstruction, dim=1) - torch.norm(real, dim=1))
                 angles = torch.abs(cs(optimal_reconstruction, real) - 1) / 2
+                real_gradient = []
+                rec_gradient = []
+                for ax1 in range(real.shape[1]):
+                    for ax2 in range(len(real.shape[2:])):
+                        r_deriv = spatial_derivative2D(real[:,ax1:ax1+1], ax2, opt['device'])
+                        rec_deriv = spatial_derivative2D(optimal_reconstruction[:,ax1:ax1+1], ax2, opt['device'])
+                        real_gradient.append(r_deriv)
+                        rec_gradient.append(rec_deriv)
+                real_gradient = torch.cat(real_gradient, 1)
+                rec_gradient = torch.cat(rec_gradient, 1)
+                gradient_loss = loss(real_gradient, rec_gradient)
 
             if(opt["physical_constraints"] == "soft"):
                 phys_loss = opt["alpha_3"] * g 
@@ -397,12 +456,16 @@ def train_single_scale(generators, discriminators, opt):
             rec_loss = loss(optimal_reconstruction, real)
             
             if(opt['alpha_1'] > 0.0):
-                rec_loss *= opt["alpha_1"]
-                rec_loss.backward(retain_graph=True)
+                rec_loss_adj = rec_loss * opt["alpha_1"]
+                rec_loss_adj.backward(retain_graph=True)
             if(opt['alpha_4'] > 0.0):
                 cs = torch.nn.CosineSimilarity(dim=1)                
                 r_loss = opt['alpha_4'] * (mags.sum() + angles.sum()) / 2
                 r_loss.backward(retain_graph=True)
+            if(opt['alpha_5'] > 0.0):
+                gradient_loss_adj = gradient_loss * opt['alpha_5']
+                gradient_loss_adj.backward(retain_graph=True)
+
             generator_optimizer.step()
 
         if epoch == 0:
@@ -448,8 +511,7 @@ def train_single_scale(generators, discriminators, opt):
         writer.add_scalar('D_loss_scale/%i'%len(generators), D_loss, epoch) 
         writer.add_scalar('G_loss_scale/%i'%len(generators), G_loss, epoch) 
         writer.add_scalar('L1/%i'%len(generators), rec_loss, epoch)
-        writer.add_scalar('Rec_min/%i'%len(generators), optimal_reconstruction.min(), epoch)
-        writer.add_scalar('Rec_max/%i'%len(generators), optimal_reconstruction.max(), epoch)
+        writer.add_scalar('Gradient_loss/%i'%len(generators), gradient_loss, epoch)
         writer.add_scalar('TAD_scale/%i'%len(generators), g, epoch)
         writer.add_scalar('Mag_loss_scale/%i'%len(generators), mags.mean(), epoch) 
         writer.add_scalar('Angle_loss_scale/%i'%len(generators), angles.mean(), epoch) 
