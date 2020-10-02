@@ -46,8 +46,8 @@ class Options():
         opt["alpha_1"]                 = 0       # Reconstruction loss coefficient
         opt["alpha_2"]                 = 1        # Adversarial loss coefficient
         opt["alpha_3"]                 = 0        # Soft physical loss coefficient
-        opt["alpha_4"]                 = 100          # mag_and_angle loss
-        opt["alpha_5"]                 = 0          # first derivative loss coeff
+        opt["alpha_4"]                 = 100       # mag_and_angle loss
+        opt["alpha_5"]                 = 100          # first derivative loss coeff
         opt["generator_steps"]         = 3
         opt["discriminator_steps"]     = 3
         opt["epochs"]                  = 2000
