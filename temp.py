@@ -16,73 +16,90 @@ from matplotlib.figure import Figure
 import pandas as pd
 
 
+
+parser = argparse.ArgumentParser(description='Test a trained model')
+
+parser.add_argument('--load_from',default="Temp")
+parser.add_argument('--data_folder',default="JHUturbulence/isotropic1024coarse",type=str,help='File to test on')
+parser.add_argument('--device',default="cuda:0",type=str,help='Frames to use from training file')
+
 MVTVSSR_folder_path = os.path.dirname(os.path.abspath(__file__))
 input_folder = os.path.join(MVTVSSR_folder_path, "InputData")
 output_folder = os.path.join(MVTVSSR_folder_path, "Output")
 save_folder = os.path.join(MVTVSSR_folder_path, "SavedModels")
 
-a = np.load(os.path.join(input_folder, "JHUturbulence", "isotropic1024coarse", "0.npy"))
-np.save(os.path.join(input_folder, "JHUturbulence", "isotropic128coarse", "0.npy"), a[:,::8,::8])
-'''
-print(a.shape)
-print(a[0].max())
-print(a[0].min())
-print(a[1].max())
-print(a[1].min())
-print(a[2].max())
-print(a[2].min())
+
+args = vars(parser.parse_args())
+
+opt = load_options(os.path.join(save_folder, args["load_from"]))
+opt["device"] = args["device"]
+opt["save_name"] = args["load_from"]
+generators, discriminators = load_models(opt,args["device"])
+
+for i in range(len(generators)):
+    generators[i] = generators[i].to(args["device"])
+    generators[i] = generators[i].eval()
+for i in range(len(discriminators)):
+    discriminators[i].to(args["device"])
+    discriminators[i].eval()
+    
+dataset = Dataset(os.path.join(input_folder, "JHUturbulence/isotropic1024coarse"), opt)
+frame = dataset.__getitem__(5).to("cuda")[:,:,::2,::2]
 
 
-plt.hist(a[0].flatten(), 50, histtype='step', stacked=True, fill=False, color='blue')
-plt.hist(a[1].flatten(), 50, histtype='step', stacked=True, fill=False, color='green')
-plt.hist(a[2].flatten(), 50, histtype='step', stacked=True, fill=False, color='orange')
-plt.legend(['u', 'v', 'w'])
-plt.title('data distribution - no scaling')
+
+x_particles = 128
+y_particles = 128
+time_length = 100
+ts_per_sec = 2
+gt_pathlines = lagrangian_transport(frame, x_particles, y_particles, time_length, ts_per_sec)
+#gt_pathline_imgs = viz_pathlines(frame, gt_pathlines, "pathlines_gt", [255, 0, 0])
+
+bicub_errs = []
+singan_errs = []
+res = []
+gen_to_use = 0
+for i in range(len(opt['resolutions'])-1):
+    gen_to_use = i
+    lr = opt['resolutions'][gen_to_use]
+    res.append(opt['resolutions'][gen_to_use][0])
+
+    f_lr = pyramid_reduce(frame[0].clone().cpu().numpy().swapaxes(0,2).swapaxes(0,1), 
+        downscale = frame.shape[2] / lr[0],
+        multichannel=True).swapaxes(0,1).swapaxes(0,2)
+    f_lr = np2torch(f_lr, opt['device']).unsqueeze(0).to(opt['device'])
+
+    bicub = F.interpolate(f_lr.clone(), size=opt['resolutions'][-1],mode=opt["upsample_mode"])
+    bicub_pathlines = lagrangian_transport(bicub, x_particles, y_particles, time_length, ts_per_sec)
+    #bicub_pathline_imgs = viz_pathlines(frame, bicub_pathlines, "pathlines_bicub", [0, 255, 0])
+
+    generated = f_lr.clone()
+    for j in range(gen_to_use+1, len(generators)):
+        with torch.no_grad():
+            generated = F.interpolate(generated, size=opt['resolutions'][j],mode=opt["upsample_mode"]).detach()
+            generated = generators[j](generated, 
+            #torch.randn(generators[j].get_input_shape()).to(opt["device"]) * opt['noise_amplitudes'][j])
+            generators[j].optimal_noise * opt['noise_amplitudes'][j])
+    singan_pathlines = lagrangian_transport(generated, x_particles, y_particles, time_length, ts_per_sec)
+    #singan_pathline_imgs = viz_pathlines(frame, singan_pathlines, "pathlines_singan", [0, 0, 255])
+
+
+    singan_pathline_dist = pathline_distance(gt_pathlines, singan_pathlines)
+    bicub_pathline_dist = pathline_distance(gt_pathlines, bicub_pathlines)
+    singan_errs.append(singan_pathline_dist)
+    bicub_errs.append(bicub_pathline_dist)
+
+
+    #for i in range(len(singan_pathline_imgs)):
+    #    singan_pathline_imgs[i] += bicub_pathline_imgs[i] + gt_pathline_imgs[i]
+    #imageio.mimwrite("pathlines_all.gif", singan_pathline_imgs)
+
+
+    #print("Singan pathline list %0.04f" % singan_pathline_dist)
+    #print("Bicub pathline list %0.04f" % bicub_pathline_dist)
+
+plt.plot(res, singan_errs, color="red")
+plt.plot(res, bicub_errs, color="blue")
+plt.title("Pathline error")
+plt.legend(["SinGAN", "Bicubic"])
 plt.show()
-
-mags = np.linalg.norm(a, axis=0)
-m_mag = mags.max()
-
-b = (a / m_mag)
-plt.hist(b[0].flatten(), 50, histtype='step', stacked=True, fill=False, color='blue')
-plt.hist(b[1].flatten(), 50, histtype='step', stacked=True, fill=False, color='green')
-plt.hist(b[2].flatten(), 50, histtype='step', stacked=True, fill=False, color='orange')
-plt.legend(['u', 'v', 'w'])
-plt.title('data distribution - magnitude scaled')
-plt.show()
-#imageio.imwrite("b", ((b+1) / 2).swapaxes(0,2).swapaxes(0,1))
-
-c = a.copy()
-c[0] -= c[0].min()
-c[0] /= c[0].max()
-c[0] -= 0.5
-c[0] *= 2
-c[1] -= c[1].min()
-c[1] /= c[1].max()
-c[1] -= 0.5
-c[1] *= 2
-c[2] -= c[2].min()
-c[2] /= c[2].max()
-c[2] -= 0.5
-c[2] *= 2
-
-#imageio.imwrite("c", ((c+1) / 2).swapaxes(0,2).swapaxes(0,1))
-plt.hist(c[0].flatten(), 50, histtype='step', stacked=True, fill=False, color='blue')
-plt.hist(c[1].flatten(), 50, histtype='step', stacked=True, fill=False, color='green')
-plt.hist(c[2].flatten(), 50, histtype='step', stacked=True, fill=False, color='orange')
-plt.legend(['u', 'v', 'w'])
-plt.title('data distribution - min/max')
-plt.show()
-
-d = b.copy()
-d[0] -= d[0].mean()
-d[1] -= d[1].mean()
-d[2] -= d[2].mean()
-#imageio.imwrite("d", ((d+1) / 2).swapaxes(0,2).swapaxes(0,1))
-plt.hist(d[0].flatten(), 50, histtype='step', stacked=True, fill=False, color='blue')
-plt.hist(d[1].flatten(), 50, histtype='step', stacked=True, fill=False, color='green')
-plt.hist(d[2].flatten(), 50, histtype='step', stacked=True, fill=False, color='orange')
-plt.legend(['u', 'v', 'w'])
-plt.title('data distribution - magnitude scaled with mean shift')
-plt.show()
-'''

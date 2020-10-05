@@ -10,7 +10,77 @@ import math
 import numbers
 from torch.nn import functional as F
 from matplotlib.pyplot import cm
+import time
 
+
+def bilinear_interpolate(im, x, y):
+    dtype = torch.cuda.FloatTensor
+    dtype_long = torch.cuda.LongTensor
+    
+    x0 = torch.floor(x).type(dtype_long)
+    x1 = x0 + 1
+    
+    y0 = torch.floor(y).type(dtype_long)
+    y1 = y0 + 1
+
+    x0 = torch.clamp(x0, 0, im.shape[2]-1)
+    x1 = torch.clamp(x1, 0, im.shape[2]-1)
+    y0 = torch.clamp(y0, 0, im.shape[3]-1)
+    y1 = torch.clamp(y1, 0, im.shape[3]-1)
+    
+    Ia = im[0, :, x0, y0 ]
+    Ib = im[0, :, x1, y0 ]
+    Ic = im[0, :, x0, y1 ]
+    Id = im[0, :, x1, y1 ]
+    wa = (x1.type(dtype)-x) * (y1.type(dtype)-y)
+    wb = (x1.type(dtype)-x) * (y-y0.type(dtype))
+    wc = (x-x0.type(dtype)) * (y1.type(dtype)-y)
+    wd = (x-x0.type(dtype)) * (y-y0.type(dtype))
+    return Ia*wa + Ib*wb + Ic*wc + Id*wd
+
+def lagrangian_transport(VF, x_res, y_res, time_length, ts_per_sec):
+    #x = torch.arange(-1, 1, int(VF.shape[2] / x_res), dtype=torch.float32).unsqueeze(1).expand([int(VF.shape[2] / x_res), int(VF.shape[3] / y_res)]).unsqueeze(0)
+
+    x = torch.arange(0, VF.shape[2], int(VF.shape[2] / x_res), dtype=torch.float32).view(1, -1).repeat([x_res, 1])
+    x = x.view(1,x_res, y_res)
+    #y = torch.arange(-1, 1, int(VF.shape[3] / y_res), dtype=torch.float32).unsqueeze(0).expand([int(VF.shape[2] / x_res), int(VF.shape[3] / y_res)]).unsqueeze(0)
+    y = torch.arange(0, VF.shape[3], int(VF.shape[3] / y_res), dtype=torch.float32).view(-1, 1).repeat([1, y_res])
+    y = y.view(1, x_res,y_res)
+    particles = torch.cat([x, y],axis=0)
+    particles = torch.reshape(particles, [2, -1]).transpose(0,1)
+    particles = particles.to("cuda")
+    #print(particles)
+    particles_over_time = []
+    
+    
+    for i in range(0, time_length * ts_per_sec):
+        particles_over_time.append(particles.clone())
+        start_t = time.time()
+        flow = bilinear_interpolate(VF, particles[:,0], particles[:,1])
+        particles[:] += flow[0:2, :].permute(1,0) * (1 / ts_per_sec)
+        particles[:] += torch.tensor(list(VF.shape[2:])).to("cuda")
+        particles[:] %= torch.tensor(list(VF.shape[2:])).to("cuda")
+    particles_over_time.append(particles)
+    
+    return particles_over_time
+
+def viz_pathlines(frame, pathlines, name, color):
+    arr = np.zeros(frame.shape)
+    arrs = []
+
+    for i in range(len(pathlines)):
+        arrs.append(arr.copy()[0].swapaxes(0,2).swapaxes(0,1))
+        for j in range(pathlines[i].shape[0]):
+            arr[0, :, int(pathlines[i][j, 0]), int(pathlines[i][j, 1])] = color
+    arrs.append(arr.copy()[0].swapaxes(0,2).swapaxes(0,1))
+    imageio.mimwrite(name + ".gif", arrs)
+    return arrs
+
+def pathline_distance(pl1, pl2):
+    d = 0
+    for i in range(len(pl1)):
+        d += torch.norm(pl1[i] - pl2[i], dim=1).sum()
+    return d
 
 def toImg(vectorField, renorm_channels = False):
     vf = vectorField.copy()

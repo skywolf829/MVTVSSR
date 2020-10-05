@@ -39,7 +39,7 @@ save_folder = os.path.join(MVTVSSR_folder_path, "SavedModels")
 
 parser = argparse.ArgumentParser(description='Test a trained model')
 
-parser.add_argument('--load_from',default="L1_512")
+parser.add_argument('--load_from',default="Temp")
 parser.add_argument('--data_folder',default="JHUturbulence/isotropic1024coarse",type=str,help='File to test on')
 parser.add_argument('--device',default="cuda:0",type=str,help='Frames to use from training file')
 
@@ -136,7 +136,7 @@ singan_err = []
 singan_psnr = []
 print(len(dataset))
 
-gen_to_use = 5
+gen_to_use = 0
 lr = opt['resolutions'][gen_to_use]
 
 for i in range(len(dataset)):

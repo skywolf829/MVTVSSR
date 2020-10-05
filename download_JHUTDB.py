@@ -80,11 +80,13 @@ field, num_components):
 def get_full_frame(x_start, x_end, y_start, y_end, z_start, z_end,
 sim_name, timestep, field, num_components):
     full = np.zeros((z_end-z_start, y_end-y_start, x_end-x_start, num_components))
+    x_len = 1024
+    y_len = 1024
     for k in range(z_start, z_end, 1):
-        for i in range(x_start, x_end, 64):
-            for j in range(y_start, y_end, 64):
-                x_stop = min(i+64, x_end)
-                y_stop = min(j+64, y_end)
+        for i in range(x_start, x_end, x_len):
+            for j in range(y_start, y_end, y_len):
+                x_stop = min(i+x_len, x_end)
+                y_stop = min(j+y_len, y_end)
                 z_stop = min(k+1, z_end)
                 full[k:z_stop,j:y_stop,i:x_stop,:] = get_frame(i,x_stop, j, y_stop, k, z_stop, sim_name, timestep, field, num_components)[0]
     return full
@@ -100,23 +102,27 @@ def download_file(url, file_name):
 def get_full_frame_parallel(x_start, x_end, y_start, y_end, z_start, z_end,
 sim_name, timestep, field, num_components, num_workers):
     threads= []
-    full = np.zeros((z_end-z_start, y_end-y_start, x_end-x_start, num_components))
+    full = np.zeros((z_end-z_start, y_end-y_start, x_end-x_start, num_components), dtype=np.float32)
     with ThreadPoolExecutor(max_workers=num_workers) as executor:
         done = 0
-        for k in range(z_start, z_end, 1):
-            for i in range(x_start, x_end, 64):
-                for j in range(y_start, y_end, 64):
-                    x_stop = min(i+64, x_end)
-                    y_stop = min(j+64, y_end)
-                    z_stop = min(k+1, z_end)
+        x_len = 128
+        y_len = 128
+        z_len = 128
+        for k in range(z_start, z_end, z_len):
+            for i in range(x_start, x_end, x_len):
+                for j in range(y_start, y_end, y_len):
+                    x_stop = min(i+x_len, x_end)
+                    y_stop = min(j+y_len, y_end)
+                    z_stop = min(k+z_len, z_end)
                     threads.append(executor.submit(get_frame, i,x_stop, j, y_stop, k, z_stop, sim_name, timestep, field, num_components))
         for task in as_completed(threads):
            r, x1, x2, y1, y2, z1, z2 = task.result()
            full[z1-z_start:z2-z_start,
            y1-y_start:y2-y_start,
-           x1-x_start:x2-x_start,:] = r
+           x1-x_start:x2-x_start,:] = r.astype(np.float32)
+           del r
            done += 1
-           #print("Done: %i/%i" % (done, len(threads)))
+           print("Done: %i/%i" % (done, len(threads)))
     return full
 
 #f = get_full_frame(0, 1024, 0, 1024, 0, 1, "isotropic1024coarse", 1, "u", 3)
@@ -125,16 +131,19 @@ sim_name, timestep, field, num_components, num_workers):
 
 frames = []
 
-name = "mixing"
-
+name = "channel"
+#name = "isotropic1024coarse"
 t0 = time.time()
 count = 0
-endts = 1000
+endts = 2
 ts_skip = 25
 for i in range(1, endts, ts_skip):
     print("TS %i/%i" % (i, endts))
-    f = get_full_frame_parallel(0, 1024, 0, 1024, 0, 1, 
-    name, i, "u", 3, 64)
+    f = get_full_frame_parallel(0, 512, #x
+    0, 512, #y
+    0, 512, #z
+    name, i, "u", 3, 
+    64)
     '''
     f = get_frame_big(1, 1, 1, 
     1024, 1024, 1, 
@@ -143,14 +152,35 @@ for i in range(1, endts, ts_skip):
     i, i+1, 1,
     "u", 3)
     '''
-    np.save(os.path.join(input_folder, "JHUturbulence",
-    name,
-    str(count) + ".npy"), f[0].swapaxes(0,2).swapaxes(1,2).astype(np.float32))
+    #np.save(os.path.join(input_folder, "JHUturbulence",
+    #name,
+    #str(count) + ".npy"), f[0].swapaxes(0,2).swapaxes(1,2).astype(np.float32))
+    print(f.shape)
+    np.save("temp.npy", f.astype(np.float32))
     count += 1
     frames.append(f[0])
 
+print("finished")
 print(time.time() - t0)
 #lJHTDB.finalize()
+
+from netCDF4 import Dataset
+rootgrp = Dataset("test.nc", "w", format="NETCDF4")
+velocity = rootgrp.createGroup("velocity")
+u = rootgrp.createDimension("u")
+v = rootgrp.createDimension("v")
+w = rootgrp.createDimension("w")
+w = rootgrp.createDimension("channels", 3)
+us = rootgrp.createVariable("u", f.dtype, ("u","v","w"))
+vs = rootgrp.createVariable("v", f.dtype, ("u","v","w"))
+ws = rootgrp.createVariable("w", f.dtype, ("u","v","w"))
+mags = rootgrp.createVariable("magnitude", f.dtype, ("u","v","w"))
+velocities = rootgrp.createVariable("velocities", f.dtype, ("u","v","w", "channels"))
+mags[:] = np.linalg.norm(f,axis=3)
+#velocities[:] = f
+
+
+'''
 f = np.array(frames)
 max_mag = None
 mags = np.zeros(f.shape)
@@ -164,14 +194,14 @@ for i in range(f.shape[0]):
 
 mags *= (1 / max_mag)
 
-'''
+
 f[:,:,:,0] -= f[:,:,:,0].min()
 f[:,:,:,0] *= (1/ f[:,:,:,0].max())
 f[:,:,:,1] -= f[:,:,:,1].min()
 f[:,:,:,1] *= (1/ f[:,:,:,1].max())
 f[:,:,:,2] -= f[:,:,:,2].min()
 f[:,:,:,2] *= (1/ f[:,:,:,2].max())
-'''
+
 
 mags = cm.coolwarm(mags[:,:,:,0])
 
@@ -179,3 +209,4 @@ imageio.mimwrite(name + "_vmag.gif", mags)
 imageio.mimwrite(name + ".gif", f)
 
 
+'''
