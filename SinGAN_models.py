@@ -495,14 +495,11 @@ def train_single_scale(generators, discriminators, opt):
                     if(opt['mode'] == "2D"):
                         fake = generator(fake_prev.detach()[:,:,starts[0]:ends[0],starts[1]:ends[1]],
                         noise[:,:,starts[0]:ends[0],starts[1]:ends[1]])
-                        output = discriminator(fake[:,:,starts[0]:ends[0],starts[1]:ends[1]])
                     elif(opt['mode'] == "3D"):
                         fake = generator(fake_prev.detach()[:,:,starts[0]:ends[0],starts[1]:ends[1],starts[2]:ends[2]],
                         noise[:,:,starts[0]:ends[0],starts[1]:ends[1],starts[2]:ends[2]])
-                        output = discriminator(fake[:,:,starts[0]:ends[0],starts[1]:ends[1],starts[2]:ends[2]])
-                else:
-                    fake = generator(fake_prev.detach(), noise)
-                    output = discriminator(fake)
+                
+                output = discriminator(fake)
                 generator_error = -output.mean() * opt["alpha_2"]
                 generator_error.backward(retain_graph=True)
                 G_loss = output.mean().item()
