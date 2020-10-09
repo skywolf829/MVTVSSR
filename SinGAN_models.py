@@ -416,7 +416,7 @@ def train_single_scale(generators, discriminators, opt):
         rmse = torch.sqrt(torch.mean((optimal_LR - real)**2))
         opt["noise_amplitudes"][-1] = rmse.item()
     
-    writer.add_graph(generator, [optimal_LR, generator.optimal_noise])
+    #writer.add_graph(generator, [optimal_LR, generator.optimal_noise])
 
     for epoch in range(opt["epochs"]):        
         # Generate fake image
