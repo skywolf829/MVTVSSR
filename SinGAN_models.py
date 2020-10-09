@@ -443,12 +443,12 @@ def train_single_scale(generators, discriminators, opt):
                 ends.append(starts[-1]+128)
         
         if(curr_size > max_dim):
-                if(opt['mode'] == "2D"):
-                    r = real[:,:,starts[0]:ends[0], starts[1]:ends[1]]
-                elif(opt['mode'] == "3D"):
-                    r = real[:,:,starts[0]:ends[0],starts[1]:ends[1],starts[2]:ends[2]]
-            else:
-                r = real
+            if(opt['mode'] == "2D"):
+                r = real[:,:,starts[0]:ends[0], starts[1]:ends[1]]
+            elif(opt['mode'] == "3D"):
+                r = real[:,:,starts[0]:ends[0],starts[1]:ends[1],starts[2]:ends[2]]
+        else:
+            r = real
 
         # Update discriminator: maximize D(x) + D(G(z))
         if(opt["alpha_2"] > 0.0):            
