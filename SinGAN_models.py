@@ -400,11 +400,13 @@ def train_single_scale(generators, discriminators, opt):
             downscale = (1 / opt["spatial_downscale_ratio"])**(len(opt["resolutions"]) - len(generators)-1),
             multichannel=True).swapaxes(0,1).swapaxes(0,2)
         elif(opt['mode'] == "3D"):
-            real = pyramid_reduce(full_res[0].clone().cpu().numpy().swapaxes(2,1).swapaxes(2,3).swapaxes(3,0), 
+            abc = full_res[0].clone().cpu().numpy().swapaxes(2,1).swapaxes(2,3).swapaxes(3,0)
+            real = pyramid_reduce(abc, 
             downscale = (1 / opt["spatial_downscale_ratio"])**(len(opt["resolutions"]) - len(generators)-1),
-            multichannel=True).swapaxes(0,3).swapaxes(3,2).swapaxes(2,1)
+            multichannel=True)
+            real = real.swapaxes(0,3).swapaxes(3,2).swapaxes(2,1)
         real = np2torch(real, device=opt["device"]).unsqueeze(0)
-
+    del full_res
     optimal_LR = torch.zeros(generator.get_input_shape(), device=opt["device"])
     opt["noise_amplitudes"].append(1.0)
     if(len(generators) > 0):
@@ -424,17 +426,36 @@ def train_single_scale(generators, discriminators, opt):
             mode=opt["upsample_mode"])
         else:
             fake_prev = torch.zeros(generator.get_input_shape()).to(opt["device"])
-        
+        fake_prev = fake_prev.detach()
         D_loss = 0
         G_loss = 0
         
         gradient_loss = 0
-        
+        max_dim = 128*128*128
+        curr_size = opt["resolutions"][len(generators)][0]
+        for z in range(1, len(opt["resolutions"][len(generators)])):
+            curr_size *= opt["resolutions"][len(generators)][z]
+        if(curr_size > max_dim):
+            starts = []
+            ends = []
+            for z in range(0, len(opt["resolutions"][len(generators)])):
+                starts.append(random.randrange(0, opt["resolutions"][len(generators)][z] - 128))
+                ends.append(starts[-1]+128)
+
+
         # Update discriminator: maximize D(x) + D(G(z))
         if(opt["alpha_2"] > 0.0):            
             for j in range(opt["discriminator_steps"]):
                 noise = opt["noise_amplitudes"][-1] * torch.randn(generator.get_input_shape()).to(opt["device"])
-                fake = generator(fake_prev.detach(), noise)
+                if(curr_size > max_dim):
+                    if(opt['mode'] == "2D"):
+                        fake = generator(fake_prev.detach()[:,:,starts[0]:ends[0],starts[1]:ends[1]],
+                        noise[:,:,starts[0]:ends[0],starts[1]:ends[1]])
+                    elif(opt['mode'] == "3D"):
+                        fake = generator(fake_prev.detach()[:,:,starts[0]:ends[0],starts[1]:ends[1],starts[2]:ends[2]],
+                        noise[:,:,starts[0]:ends[0],starts[1]:ends[1],starts[2]:ends[2]])
+                else:
+                    fake = generator(fake_prev.detach(), noise)
                 D_loss = 0
                 # Train with real downscaled to this scale
                 discriminator.zero_grad()
@@ -444,7 +465,14 @@ def train_single_scale(generators, discriminators, opt):
                 discrim_error_real.backward(retain_graph=True)
 
                 # Train with the generated image
-                output = discriminator(fake.detach())
+                if(curr_size > max_dim):
+                    if(opt['mode'] == "2D"):
+                        output = discriminator(fake.detach()[:,:,starts[0]:ends[0],starts[1]:ends[1]])
+                    elif(opt['mode'] == "3D"):
+                        output = discriminator(fake.detach()[:,:,starts[0]:ends[0],starts[1]:ends[1],starts[2]:ends[2]])
+                else:
+                    output = discriminator(fake.detach())
+                
                 D_loss -= output.mean().item()
                 discrim_error_fake = opt["alpha_2"] * output.mean()
                 discrim_error_fake.backward(retain_graph=True)
@@ -456,8 +484,18 @@ def train_single_scale(generators, discriminators, opt):
             generator.zero_grad()            
             if opt["alpha_2"] > 0.0:
                 noise = opt["noise_amplitudes"][-1] * torch.randn(generator.get_input_shape()).to(opt["device"])
-                fake = generator(fake_prev.detach(), noise)
-                output = discriminator(fake)
+                if(curr_size > max_dim):
+                    if(opt['mode'] == "2D"):
+                        fake = generator(fake_prev.detach()[:,:,starts[0]:ends[0],starts[1]:ends[1]],
+                        noise[:,:,starts[0]:ends[0],starts[1]:ends[1]])
+                        output = discriminator(fake[:,:,starts[0]:ends[0],starts[1]:ends[1]])
+                    elif(opt['mode'] == "3D"):
+                        fake = generator(fake_prev.detach()[:,:,starts[0]:ends[0],starts[1]:ends[1],starts[2]:ends[2]],
+                        noise[:,:,starts[0]:ends[0],starts[1]:ends[1],starts[2]:ends[2]])
+                        output = discriminator(fake[:,:,starts[0]:ends[0],starts[1]:ends[1],starts[2]:ends[2]])
+                else:
+                    fake = generator(fake_prev.detach(), noise)
+                    output = discriminator(fake)
                 generator_error = -output.mean() * opt["alpha_2"]
                 generator_error.backward(retain_graph=True)
                 G_loss = output.mean().item()
@@ -466,8 +504,18 @@ def train_single_scale(generators, discriminators, opt):
             loss = nn.L1Loss().cuda(opt["device"])
             
             # Re-compute the constructed image
-            optimal_reconstruction = generator(optimal_LR.detach().clone(), 
-            opt["noise_amplitudes"][-1]*generator.optimal_noise)
+            if(curr_size > max_dim):
+                opt_noise = opt["noise_amplitudes"][-1]*generator.optimal_noise
+                if(opt['mode'] == "2D"):
+                    optimal_reconstruction = generator(optimal_LR.detach()[:,:,starts[0]:ends[0],starts[1]:ends[1]].clone(), 
+                    opt_noise[:,:,starts[0]:ends[0],starts[1]:ends[1]])
+                elif(opt['mode'] == "3D"):
+                    optimal_reconstruction = generator(optimal_LR.detach()[:,:,starts[0]:ends[0],starts[1]:ends[1],starts[2]:ends[2]].clone(), 
+                    opt_noise[:,:,starts[0]:ends[0],starts[1]:ends[1],starts[2]:ends[2]])
+            else:
+                optimal_reconstruction = generator(optimal_LR.detach().clone(), 
+                opt["noise_amplitudes"][-1]*generator.optimal_noise)
+            
             
             g = 0
             if(opt['mode'] == "2D"):
@@ -479,18 +527,26 @@ def train_single_scale(generators, discriminators, opt):
             mags = np.zeros(1)
             angles = np.zeros(1)
 
+            if(curr_size > max_dim):
+                if(opt['mode'] == "2D"):
+                    r = real[:,:,starts[0]:ends[0], starts[1]:ends[1]]
+                elif(opt['mode'] == "3D"):
+                    r = real[:,:,starts[0]:ends[0],starts[1]:ends[1],starts[2]:ends[2]]
+            else:
+                r = real
+
             cs = torch.nn.CosineSimilarity(dim=1)
-            mags = torch.abs(torch.norm(optimal_reconstruction, dim=1) - torch.norm(real, dim=1))
-            angles = torch.abs(cs(optimal_reconstruction, real) - 1) / 2            
+            mags = torch.abs(torch.norm(optimal_reconstruction, dim=1) - torch.norm(r, dim=1))
+            angles = torch.abs(cs(optimal_reconstruction, r) - 1) / 2
             real_gradient = []
             rec_gradient = []
-            for ax1 in range(real.shape[1]):
-                for ax2 in range(len(real.shape[2:])):
+            for ax1 in range(r.shape[1]):
+                for ax2 in range(len(r.shape[2:])):
                     if(opt["mode"] == '2D'):
-                        r_deriv = spatial_derivative2D(real[:,ax1:ax1+1], ax2, opt['device'])
+                        r_deriv = spatial_derivative2D(r[:,ax1:ax1+1], ax2, opt['device'])
                         rec_deriv = spatial_derivative2D(optimal_reconstruction[:,ax1:ax1+1], ax2, opt['device'])
                     elif(opt['mode'] == '3D'):
-                        r_deriv = spatial_derivative3D_CD(real[:,ax1:ax1+1], ax2, opt['device'])
+                        r_deriv = spatial_derivative3D_CD(r[:,ax1:ax1+1], ax2, opt['device'])
                         rec_deriv = spatial_derivative3D_CD(optimal_reconstruction[:,ax1:ax1+1], ax2, opt['device'])
                     real_gradient.append(r_deriv)
                     rec_gradient.append(rec_deriv)
@@ -501,7 +557,7 @@ def train_single_scale(generators, discriminators, opt):
             if(opt["physical_constraints"] == "soft"):
                 phys_loss = opt["alpha_3"] * g 
                 phys_loss.backward(retain_graph = True)
-            rec_loss = loss(optimal_reconstruction, real)
+            rec_loss = loss(optimal_reconstruction, r)
             
             if(opt['alpha_1'] > 0.0):
                 rec_loss_adj = rec_loss * opt["alpha_1"]
