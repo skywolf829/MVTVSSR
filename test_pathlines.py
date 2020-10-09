@@ -44,20 +44,21 @@ for i in range(len(discriminators)):
     discriminators[i].eval()
     
 dataset = Dataset(os.path.join(input_folder, "JHUturbulence/isotropic1024coarse"), opt)
-frame = dataset.__getitem__(5).to("cuda")[:,:,::2,::2]
+frame = dataset.__getitem__(39).to("cuda")[:,:,::2,::2]
 
 
 
-x_particles = 128
-y_particles = 128
-time_length = 100
-ts_per_sec = 2
+x_particles = 16
+y_particles = 16
+time_length = 200
+ts_per_sec = 1
 gt_pathlines = lagrangian_transport(frame, x_particles, y_particles, time_length, ts_per_sec)
-#gt_pathline_imgs = viz_pathlines(frame, gt_pathlines, "pathlines_gt", [255, 0, 0])
+gt_pathline_imgs = viz_pathlines(frame, gt_pathlines, "pathlines_gt", [255, 0, 0])
 
 bicub_errs = []
 singan_errs = []
 res = []
+gen_to_save = 5
 gen_to_use = 0
 for i in range(len(opt['resolutions'])-1):
     gen_to_use = i
@@ -71,7 +72,8 @@ for i in range(len(opt['resolutions'])-1):
 
     bicub = F.interpolate(f_lr.clone(), size=opt['resolutions'][-1],mode=opt["upsample_mode"])
     bicub_pathlines = lagrangian_transport(bicub, x_particles, y_particles, time_length, ts_per_sec)
-    #bicub_pathline_imgs = viz_pathlines(frame, bicub_pathlines, "pathlines_bicub", [0, 255, 0])
+    if(i == gen_to_save):
+        bicub_pathline_imgs = viz_pathlines(frame, bicub_pathlines, "pathlines_bicub", [0, 255, 0])
 
     generated = f_lr.clone()
     for j in range(gen_to_use+1, len(generators)):
@@ -81,7 +83,8 @@ for i in range(len(opt['resolutions'])-1):
             #torch.randn(generators[j].get_input_shape()).to(opt["device"]) * opt['noise_amplitudes'][j])
             generators[j].optimal_noise * opt['noise_amplitudes'][j])
     singan_pathlines = lagrangian_transport(generated, x_particles, y_particles, time_length, ts_per_sec)
-    #singan_pathline_imgs = viz_pathlines(frame, singan_pathlines, "pathlines_singan", [0, 0, 255])
+    if(i == gen_to_save):
+        singan_pathline_imgs = viz_pathlines(frame, singan_pathlines, "pathlines_singan", [0, 0, 255])
 
 
     singan_pathline_dist = pathline_distance(gt_pathlines, singan_pathlines)
@@ -89,17 +92,19 @@ for i in range(len(opt['resolutions'])-1):
     singan_errs.append(singan_pathline_dist)
     bicub_errs.append(bicub_pathline_dist)
 
-
-    #for i in range(len(singan_pathline_imgs)):
-    #    singan_pathline_imgs[i] += bicub_pathline_imgs[i] + gt_pathline_imgs[i]
-    #imageio.mimwrite("pathlines_all.gif", singan_pathline_imgs)
-
+    if(i == gen_to_save):
+        for j in range(len(singan_pathline_imgs)):
+            singan_pathline_imgs[j] += bicub_pathline_imgs[j] + gt_pathline_imgs[j]
+        imageio.mimwrite("pathlines_all.gif", singan_pathline_imgs)
+        imageio.imwrite("pathlines_all.png", singan_pathline_imgs[-1])
 
     #print("Singan pathline list %0.04f" % singan_pathline_dist)
     #print("Bicub pathline list %0.04f" % bicub_pathline_dist)
 
 plt.plot(res, singan_errs, color="red")
 plt.plot(res, bicub_errs, color="blue")
-plt.title("Pathline error")
+plt.title("Pathline error for SinGAN levels")
+plt.xlabel("Resolution")
+plt.ylabel("Pathline error")
 plt.legend(["SinGAN", "Bicubic"])
 plt.show()

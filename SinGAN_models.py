@@ -395,13 +395,15 @@ def train_single_scale(generators, discriminators, opt):
     
     real = full_res.clone()
     if(len(generators) + 1 is not len(opt["resolutions"])):
-        real = pyramid_reduce(full_res[0].clone().cpu().numpy().swapaxes(0,2).swapaxes(0,1), 
-        downscale = (1 / opt["spatial_downscale_ratio"])**(len(opt["resolutions"]) - len(generators)-1),
-        multichannel=True).swapaxes(0,1).swapaxes(0,2)
+        if(opt['mode'] == '2D'):
+            real = pyramid_reduce(full_res[0].clone().cpu().numpy().swapaxes(0,2).swapaxes(0,1), 
+            downscale = (1 / opt["spatial_downscale_ratio"])**(len(opt["resolutions"]) - len(generators)-1),
+            multichannel=True).swapaxes(0,1).swapaxes(0,2)
+        elif(opt['mode'] == "3D"):
+            real = pyramid_reduce(full_res[0].clone().cpu().numpy().swapaxes(2,1).swapaxes(2,3).swapaxes(3,0), 
+            downscale = (1 / opt["spatial_downscale_ratio"])**(len(opt["resolutions"]) - len(generators)-1),
+            multichannel=True).swapaxes(0,3).swapaxes(3,2).swapaxes(2,1)
         real = np2torch(real, device=opt["device"]).unsqueeze(0)
-    print("Real")
-    print(real.max())
-    print(real.min())
 
     optimal_LR = torch.zeros(generator.get_input_shape(), device=opt["device"])
     opt["noise_amplitudes"].append(1.0)
@@ -468,28 +470,34 @@ def train_single_scale(generators, discriminators, opt):
             opt["noise_amplitudes"][-1]*generator.optimal_noise)
             
             g = 0
-            if(real.shape[1] > 1):
+            if(opt['mode'] == "2D"):
                 g_map = TAD(dataset.unscale(optimal_reconstruction), opt["device"])            
-                g = g_map.sum()
+                g = g_map.mean()
+            elif(opt['mode'] == "3D"):
+                g_map = TAD3D_CD(dataset.unscale(optimal_reconstruction), opt["device"])
+                g = g_map.mean()
             mags = np.zeros(1)
             angles = np.zeros(1)
-            if(real.shape[1] > 1):
-                cs = torch.nn.CosineSimilarity(dim=1)
-                #mags = mag_difference(optimal_reconstruction, real)
-                mags = torch.abs(torch.norm(optimal_reconstruction, dim=1) - torch.norm(real, dim=1))
-                angles = torch.abs(cs(optimal_reconstruction, real) - 1) / 2
-                real_gradient = []
-                rec_gradient = []
-                for ax1 in range(real.shape[1]):
-                    for ax2 in range(len(real.shape[2:])):
+
+            cs = torch.nn.CosineSimilarity(dim=1)
+            mags = torch.abs(torch.norm(optimal_reconstruction, dim=1) - torch.norm(real, dim=1))
+            angles = torch.abs(cs(optimal_reconstruction, real) - 1) / 2            
+            real_gradient = []
+            rec_gradient = []
+            for ax1 in range(real.shape[1]):
+                for ax2 in range(len(real.shape[2:])):
+                    if(opt["mode"] == '2D'):
                         r_deriv = spatial_derivative2D(real[:,ax1:ax1+1], ax2, opt['device'])
                         rec_deriv = spatial_derivative2D(optimal_reconstruction[:,ax1:ax1+1], ax2, opt['device'])
-                        real_gradient.append(r_deriv)
-                        rec_gradient.append(rec_deriv)
-                real_gradient = torch.cat(real_gradient, 1)
-                rec_gradient = torch.cat(rec_gradient, 1)
-                gradient_loss = loss(real_gradient, rec_gradient)
-
+                    elif(opt['mode'] == '3D'):
+                        r_deriv = spatial_derivative3D_CD(real[:,ax1:ax1+1], ax2, opt['device'])
+                        rec_deriv = spatial_derivative3D_CD(optimal_reconstruction[:,ax1:ax1+1], ax2, opt['device'])
+                    real_gradient.append(r_deriv)
+                    rec_gradient.append(rec_deriv)
+            real_gradient = torch.cat(real_gradient, 1)
+            rec_gradient = torch.cat(rec_gradient, 1)
+            gradient_loss = loss(real_gradient, rec_gradient)
+            
             if(opt["physical_constraints"] == "soft"):
                 phys_loss = opt["alpha_3"] * g 
                 phys_loss.backward(retain_graph = True)
@@ -500,7 +508,7 @@ def train_single_scale(generators, discriminators, opt):
                 rec_loss_adj.backward(retain_graph=True)
             if(opt['alpha_4'] > 0.0):
                 cs = torch.nn.CosineSimilarity(dim=1)                
-                r_loss = opt['alpha_4'] * (mags.sum() + angles.sum()) / 2
+                r_loss = opt['alpha_4'] * (mags.mean() + angles.mean()) / 2
                 r_loss.backward(retain_graph=True)
             if(opt['alpha_5'] > 0.0):
                 gradient_loss_adj = gradient_loss * opt['alpha_5']
@@ -545,7 +553,7 @@ def train_single_scale(generators, discriminators, opt):
                 g_cm, epoch)
         
         print_to_log_and_console("%i/%i: Dloss=%.02f Gloss=%.02f L1=%.04f TAD=%.02f AMD=%.02f AAD=%.02f" %
-        (epoch, opt['epochs'], D_loss, G_loss, rec_loss, g, mags.sum(), angles.sum()), 
+        (epoch, opt['epochs'], D_loss, G_loss, rec_loss, g, mags.mean(), angles.mean()), 
         os.path.join(opt["save_folder"], opt["save_name"]), "log.txt")
 
         writer.add_scalar('D_loss_scale/%i'%len(generators), D_loss, epoch) 
@@ -725,7 +733,7 @@ class SinGAN_Discriminator(nn.Module):
         if(use_sn):
             for m in self.model.modules():
                 classname = m.__class__.__name__
-                if classname.find('Conv2d') != -1:
+                if classname.find('Conv') != -1:
                     m = torch.nn.utils.spectral_norm(m)
                 elif classname.find('Norm') != -1:
                     m = torch.nn.utils.spectral_norm(m)

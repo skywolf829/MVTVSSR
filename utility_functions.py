@@ -84,21 +84,24 @@ def pathline_distance(pl1, pl2):
 
 def toImg(vectorField, renorm_channels = False):
     vf = vectorField.copy()
-    if(vf.shape[0] == 1):
-        return cm.coolwarm(vf[0]).swapaxes(0,2).swapaxes(1,2)
-    elif(vf.shape[0] == 2):
-        vf += 1
-        vf *= 0.5
-        vf = vf.clip(0, 1)
-        z = np.zeros([1, vf.shape[1], vf.shape[2]])
-        vf = np.concatenate([vf, z])
-        return vf
-    elif(vf.shape[0] == 3):
-        if(renorm_channels):
-            for j in range(vf.shape[0]):
-                vf[j] -= vf[j].min()
-                vf[j] *= (1 / vf[j].max())
-        return vf
+    if(len(vf.shape) == 3):
+        if(vf.shape[0] == 1):
+            return cm.coolwarm(vf[0]).swapaxes(0,2).swapaxes(1,2)
+        elif(vf.shape[0] == 2):
+            vf += 1
+            vf *= 0.5
+            vf = vf.clip(0, 1)
+            z = np.zeros([1, vf.shape[1], vf.shape[2]])
+            vf = np.concatenate([vf, z])
+            return vf
+        elif(vf.shape[0] == 3):
+            if(renorm_channels):
+                for j in range(vf.shape[0]):
+                    vf[j] -= vf[j].min()
+                    vf[j] *= (1 / vf[j].max())
+            return vf
+    elif(len(vf.shape) == 4):
+        return toImg(vf[:,:,:,0], renorm_channels)
 
 def to_mag(vectorField, normalize=True, max_mag = None):
     vf = vectorField.copy()

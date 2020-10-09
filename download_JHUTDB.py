@@ -142,21 +142,14 @@ for i in range(1, endts, ts_skip):
     f = get_full_frame_parallel(0, 512, #x
     0, 512, #y
     0, 512, #z
-    name, i, "u", 3, 
+    name, i, 
+    "u", 3, 
     64)
-    '''
-    f = get_frame_big(1, 1, 1, 
-    1024, 1024, 1, 
-    1, 1, 1, 
-    "isotropic1024coarse", 
-    i, i+1, 1,
-    "u", 3)
-    '''
     #np.save(os.path.join(input_folder, "JHUturbulence",
     #name,
     #str(count) + ".npy"), f[0].swapaxes(0,2).swapaxes(1,2).astype(np.float32))
     print(f.shape)
-    np.save("temp.npy", f.astype(np.float32))
+    np.save("p.npy", f.astype(np.float32))
     count += 1
     frames.append(f[0])
 

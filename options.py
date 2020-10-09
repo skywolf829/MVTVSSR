@@ -5,8 +5,8 @@ class Options():
     def get_default():
         opt = {}
         # Input info
-        opt["mode"]                    = "2D"      # What SinGAN to use - 2D or 3D
-        opt["training_folder"]         = "JHUturbulence/isotropic1024coarse"
+        opt["mode"]                    = "3D"      # What SinGAN to use - 2D or 3D
+        opt["training_folder"]         = "JHUturbulence/channel3D"
         opt["image_normalize"]         = False
         opt["scale_data"]              = False
         opt['scale_on_magnitude']      = True
@@ -31,7 +31,7 @@ class Options():
         opt["noise_amplitudes"]        = []
         opt["use_spectral_norm"]       = True
         opt["downsample_mode"]         = "nearest"
-        opt["upsample_mode"]           = "bicubic"
+        opt["upsample_mode"]           = "trilinear"
 
         opt["train_distributed"]       = False
         opt["device"]                  = "cuda:0"
@@ -46,8 +46,8 @@ class Options():
         opt["alpha_1"]                 = 0       # Reconstruction loss coefficient
         opt["alpha_2"]                 = 1        # Adversarial loss coefficient
         opt["alpha_3"]                 = 0        # Soft physical loss coefficient
-        opt["alpha_4"]                 = 100       # mag_and_angle loss
-        opt["alpha_5"]                 = 100          # first derivative loss coeff
+        opt["alpha_4"]                 = 10       # mag_and_angle loss
+        opt["alpha_5"]                 = 1          # first derivative loss coeff
         opt["generator_steps"]         = 3
         opt["discriminator_steps"]     = 3
         opt["epochs"]                  = 2000

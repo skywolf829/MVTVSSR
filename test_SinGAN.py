@@ -118,7 +118,11 @@ print("Total err singan %0.02f" % total_err)
 print("MSE singan %0.02f" % mse)
 '''
 
+#from skimage.metrics import structural_similarity as ssim
+#from skimage.metrics import mean_squared_error
 
+from pytorch_msssim import ssim, ms_ssim, SSIM, MS_SSIM
+from piq import vif_p
 # One shot super resolution
 dataset = Dataset(os.path.join(input_folder, args["data_folder"]), opt)
 
@@ -132,8 +136,15 @@ singan_mag = []
 
 bicub_err = []
 bicub_psnr = []
+bicub_ssim = []
+bicub_ms_ssim = []
+bicub_vif = []
+
 singan_err = []
 singan_psnr = []
+singan_ssim = []
+singan_ms_ssim = []
+singan_vif = []
 print(len(dataset))
 
 gen_to_use = 0
@@ -142,12 +153,12 @@ lr = opt['resolutions'][gen_to_use]
 for i in range(len(dataset)):
     print(i)
     f = dataset.__getitem__(i).to(opt['device'])
-    print(TAD(dataset.unscale(f), opt['device']).sum())
-    f_lr = pyramid_reduce(f[0].clone().cpu().numpy().swapaxes(0,2).swapaxes(0,1), 
-        downscale = f.shape[2] / lr[0],
+    #print(TAD(dataset.unscale(f), opt['device']).sum())
+    f_hr = f.clone()[:,:,::2,::2].to(opt['device'])
+    f_lr = pyramid_reduce(f_hr[0].clone().cpu().numpy().swapaxes(0,2).swapaxes(0,1), 
+        downscale = f_hr.shape[2] / lr[0],
         multichannel=True).swapaxes(0,1).swapaxes(0,2)
     f_lr = np2torch(f_lr, opt['device']).unsqueeze(0).to(opt['device'])
-    f_hr = f.clone()[:,:,::2,::2].to(opt['device'])
     g_mag = torch.norm(f_hr, dim=1).detach().cpu().numpy()
     GT_frames.append(toImg(f_hr.clone()[0].detach().cpu().numpy()).swapaxes(0,2).swapaxes(0,1))
     gt_mag.append(toImg(g_mag).swapaxes(0,2).swapaxes(0,1))
@@ -172,6 +183,27 @@ for i in range(len(dataset)):
     singan_err.append(abs(generated-f_hr).sum())
     singan_psnr.append(PSNR(f_hr.clone(), generated, max_val=(f_hr.max()-f_hr.min())))
     singan_mag.append(toImg(s_mag).swapaxes(0,2).swapaxes(0,1))
+
+    singan_ssim.append(ssim(np2torch(singan_mag[-1], "cuda").permute(2, 1, 0).unsqueeze(0)[:,0:3,:,:], 
+                        np2torch(gt_mag[-1], "cuda").permute(2, 1, 0).unsqueeze(0)[:,0:3,:,:],
+                        data_range=1, size_average=False))
+    bicub_ssim.append(ssim(np2torch(bicub_mag[-1], "cuda").permute(2, 1, 0).unsqueeze(0)[:,0:3,:,:], 
+                        np2torch(gt_mag[-1], "cuda").permute(2, 1, 0).unsqueeze(0)[:,0:3,:,:],
+                        data_range=1, size_average=False))
+
+    singan_ms_ssim.append(ms_ssim(np2torch(singan_mag[-1], "cuda").permute(2, 1, 0).unsqueeze(0)[:,0:3,:,:], 
+                        np2torch(gt_mag[-1], "cuda").permute(2, 1, 0).unsqueeze(0)[:,0:3,:,:],
+                        data_range=1, size_average=False))
+    bicub_ms_ssim.append(ms_ssim(np2torch(bicub_mag[-1], "cuda").permute(2, 1, 0).unsqueeze(0)[:,0:3,:,:], 
+                        np2torch(gt_mag[-1], "cuda").permute(2, 1, 0).unsqueeze(0)[:,0:3,:,:],
+                        data_range=1, size_average=False))
+
+    singan_vif.append(vif_p(np2torch(singan_mag[-1], "cuda").permute(2, 1, 0).unsqueeze(0)[:,0:3,:,:],
+                        np2torch(gt_mag[-1], "cuda").permute(2, 1, 0).unsqueeze(0)[:,0:3,:,:],
+                        data_range=1))
+    bicub_vif.append(vif_p(np2torch(bicub_mag[-1], "cuda").permute(2, 1, 0).unsqueeze(0)[:,0:3,:,:],
+                        np2torch(gt_mag[-1], "cuda").permute(2, 1, 0).unsqueeze(0)[:,0:3,:,:],                         
+                        data_range=1))
 
 imageio.mimwrite("singan.gif", singan_frames)
 imageio.mimwrite("singan_mag.gif", singan_mag)
@@ -199,4 +231,22 @@ plt.plot(np.arange(0, len(singan_psnr)), singan_psnr, color='red')
 plt.plot(np.arange(0, len(singan_psnr)), bicub_psnr, color='blue')
 plt.legend(['SinGAN', 'Bicubic'])
 plt.title('PSNR per frame')
+plt.show()
+
+plt.plot(np.arange(0, len(singan_ssim)), singan_ssim, color='red')
+plt.plot(np.arange(0, len(singan_ssim)), bicub_ssim, color='blue')
+plt.legend(['SinGAN', 'Bicubic'])
+plt.title('SSIM for magnitude plot per frame')
+plt.show()
+
+plt.plot(np.arange(0, len(singan_ssim)), singan_ms_ssim, color='red')
+plt.plot(np.arange(0, len(singan_ssim)), bicub_ms_ssim, color='blue')
+plt.legend(['SinGAN', 'Bicubic'])
+plt.title('MS_SSIM for magnitude plot per frame')
+plt.show()
+
+plt.plot(np.arange(0, len(singan_ssim)), singan_vif, color='red')
+plt.plot(np.arange(0, len(singan_ssim)), bicub_vif, color='blue')
+plt.legend(['SinGAN', 'Bicubic'])
+plt.title('Visual information fidelity score for magnitude plot per frame')
 plt.show()
