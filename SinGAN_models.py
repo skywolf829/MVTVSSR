@@ -431,7 +431,8 @@ def train_single_scale(generators, discriminators, opt):
         G_loss = 0
         
         gradient_loss = 0
-        max_dim = 128*128*128
+        dim_s = 96
+        max_dim = dim_s*dim_s*dim_s
         curr_size = opt["resolutions"][len(generators)][0]
         for z in range(1, len(opt["resolutions"][len(generators)])):
             curr_size *= opt["resolutions"][len(generators)][z]
@@ -439,8 +440,8 @@ def train_single_scale(generators, discriminators, opt):
             starts = []
             ends = []
             for z in range(0, len(opt["resolutions"][len(generators)])):
-                starts.append(random.randrange(0, opt["resolutions"][len(generators)][z] - 128))
-                ends.append(starts[-1]+128)
+                starts.append(random.randrange(0, opt["resolutions"][len(generators)][z] - dim_s))
+                ends.append(starts[-1]+dim_s)
         
         if(curr_size > max_dim):
             if(opt['mode'] == "2D"):
