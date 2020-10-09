@@ -450,7 +450,7 @@ def train_single_scale(generators, discriminators, opt):
                 r = real[:,:,starts[0]:ends[0],starts[1]:ends[1],starts[2]:ends[2]]
         else:
             r = real
-
+        print(r.shape)
         # Update discriminator: maximize D(x) + D(G(z))
         if(opt["alpha_2"] > 0.0):            
             for j in range(opt["discriminator_steps"]):
@@ -464,6 +464,7 @@ def train_single_scale(generators, discriminators, opt):
                         noise[:,:,starts[0]:ends[0],starts[1]:ends[1],starts[2]:ends[2]])
                 else:
                     fake = generator(fake_prev.detach(), noise)
+                print(fake.shape)
                 D_loss = 0
                 # Train with real downscaled to this scale
                 discriminator.zero_grad()
@@ -473,13 +474,7 @@ def train_single_scale(generators, discriminators, opt):
                 discrim_error_real.backward(retain_graph=True)
 
                 # Train with the generated image
-                if(curr_size > max_dim):
-                    if(opt['mode'] == "2D"):
-                        output = discriminator(fake.detach()[:,:,starts[0]:ends[0],starts[1]:ends[1]])
-                    elif(opt['mode'] == "3D"):
-                        output = discriminator(fake.detach()[:,:,starts[0]:ends[0],starts[1]:ends[1],starts[2]:ends[2]])
-                else:
-                    output = discriminator(fake.detach())
+                output = discriminator(fake.detach())
                 
                 D_loss -= output.mean().item()
                 discrim_error_fake = opt["alpha_2"] * output.mean()
@@ -504,6 +499,7 @@ def train_single_scale(generators, discriminators, opt):
                 else:
                     fake = generator(fake_prev.detach(), noise)
                     output = discriminator(fake)
+                print(fake.shape)
                 generator_error = -output.mean() * opt["alpha_2"]
                 generator_error.backward(retain_graph=True)
                 G_loss = output.mean().item()
@@ -523,7 +519,7 @@ def train_single_scale(generators, discriminators, opt):
             else:
                 optimal_reconstruction = generator(optimal_LR.detach().clone(), 
                 opt["noise_amplitudes"][-1]*generator.optimal_noise)
-            
+            print(optimal_reconstruction.shape)
             
             g = 0
             if(opt['mode'] == "2D"):
