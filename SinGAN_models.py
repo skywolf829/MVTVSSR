@@ -441,7 +441,14 @@ def train_single_scale(generators, discriminators, opt):
             for z in range(0, len(opt["resolutions"][len(generators)])):
                 starts.append(random.randrange(0, opt["resolutions"][len(generators)][z] - 128))
                 ends.append(starts[-1]+128)
-
+        
+        if(curr_size > max_dim):
+                if(opt['mode'] == "2D"):
+                    r = real[:,:,starts[0]:ends[0], starts[1]:ends[1]]
+                elif(opt['mode'] == "3D"):
+                    r = real[:,:,starts[0]:ends[0],starts[1]:ends[1],starts[2]:ends[2]]
+            else:
+                r = real
 
         # Update discriminator: maximize D(x) + D(G(z))
         if(opt["alpha_2"] > 0.0):            
@@ -459,7 +466,7 @@ def train_single_scale(generators, discriminators, opt):
                 D_loss = 0
                 # Train with real downscaled to this scale
                 discriminator.zero_grad()
-                output = discriminator(real)
+                output = discriminator(r)
                 D_loss += output.mean().item()
                 discrim_error_real = opt["alpha_2"] * -output.mean()
                 discrim_error_real.backward(retain_graph=True)
@@ -527,13 +534,7 @@ def train_single_scale(generators, discriminators, opt):
             mags = np.zeros(1)
             angles = np.zeros(1)
 
-            if(curr_size > max_dim):
-                if(opt['mode'] == "2D"):
-                    r = real[:,:,starts[0]:ends[0], starts[1]:ends[1]]
-                elif(opt['mode'] == "3D"):
-                    r = real[:,:,starts[0]:ends[0],starts[1]:ends[1],starts[2]:ends[2]]
-            else:
-                r = real
+            
 
             cs = torch.nn.CosineSimilarity(dim=1)
             mags = torch.abs(torch.norm(optimal_reconstruction, dim=1) - torch.norm(r, dim=1))
