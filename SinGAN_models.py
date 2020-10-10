@@ -410,7 +410,7 @@ def train_single_scale(generators, discriminators, opt):
     optimal_LR = torch.zeros(generator.get_input_shape(), device=opt["device"])
     opt["noise_amplitudes"].append(1.0)
     if(len(generators) > 0):
-        with torch.no_grad:
+        with torch.no_grad():
             optimal_LR = generate(generators, "reconstruct", opt, opt["device"])
         optimal_LR = F.interpolate(optimal_LR, size=opt["resolutions"][len(generators)],
         mode=opt["upsample_mode"])
@@ -451,7 +451,7 @@ def train_single_scale(generators, discriminators, opt):
                 r = real[:,:,starts[0]:ends[0],starts[1]:ends[1],starts[2]:ends[2]]
         else:
             r = real
-        print(r.shape)
+            
         # Update discriminator: maximize D(x) + D(G(z))
         if(opt["alpha_2"] > 0.0):            
             for j in range(opt["discriminator_steps"]):
