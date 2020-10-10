@@ -388,25 +388,25 @@ def train_single_scale(generators, discriminators, opt):
     images_seen = 0
 
     # Get properly sized frame for this generator
-    full_res = dataset.__getitem__(0)
-    full_res = full_res.to(opt["device"])
+    real = dataset.__getitem__(0)
+    real = real.to(opt["device"])
     
     print(str(len(generators)) + ": " + str(opt["resolutions"][len(generators)]))
     
-    real = full_res.clone()
     if(len(generators) + 1 is not len(opt["resolutions"])):
         if(opt['mode'] == '2D'):
-            real = pyramid_reduce(full_res[0].clone().cpu().numpy().swapaxes(0,2).swapaxes(0,1), 
+            real = pyramid_reduce(real[0].clone().cpu().numpy().swapaxes(0,2).swapaxes(0,1), 
             downscale = (1 / opt["spatial_downscale_ratio"])**(len(opt["resolutions"]) - len(generators)-1),
             multichannel=True).swapaxes(0,1).swapaxes(0,2)
         elif(opt['mode'] == "3D"):
-            abc = full_res[0].clone().cpu().numpy().swapaxes(2,1).swapaxes(2,3).swapaxes(3,0)
+            abc = real[0].clone().cpu().numpy().swapaxes(2,1).swapaxes(2,3).swapaxes(3,0)
             real = pyramid_reduce(abc, 
             downscale = (1 / opt["spatial_downscale_ratio"])**(len(opt["resolutions"]) - len(generators)-1),
             multichannel=True)
             real = real.swapaxes(0,3).swapaxes(3,2).swapaxes(2,1)
         real = np2torch(real, device=opt["device"]).unsqueeze(0)
-    del full_res
+    
+    
     optimal_LR = torch.zeros(generator.get_input_shape(), device=opt["device"])
     opt["noise_amplitudes"].append(1.0)
     if(len(generators) > 0):
@@ -421,13 +421,14 @@ def train_single_scale(generators, discriminators, opt):
 
     for epoch in range(opt["epochs"]):        
         # Generate fake image
-        if(len(generators) > 0):
-            fake_prev = generate(generators, "random", opt, opt["device"])
-            fake_prev = F.interpolate(fake_prev, size=opt["resolutions"][len(generators)],
-            mode=opt["upsample_mode"])
-        else:
-            fake_prev = torch.zeros(generator.get_input_shape()).to(opt["device"])
-        fake_prev = fake_prev.detach()
+        with torch.no_grad():
+            if(len(generators) > 0):
+                fake_prev = generate(generators, "random", opt, opt["device"])
+                fake_prev = F.interpolate(fake_prev, size=opt["resolutions"][len(generators)],
+                mode=opt["upsample_mode"])
+            else:
+                fake_prev = torch.zeros(generator.get_input_shape()).to(opt["device"])
+            fake_prev = fake_prev.detach()
         D_loss = 0
         G_loss = 0
         
@@ -465,7 +466,6 @@ def train_single_scale(generators, discriminators, opt):
                         noise[:,:,starts[0]:ends[0],starts[1]:ends[1],starts[2]:ends[2]])
                 else:
                     fake = generator(fake_prev.detach(), noise)
-                print(fake.shape)
                 D_loss = 0
                 # Train with real downscaled to this scale
                 discriminator.zero_grad()
@@ -500,7 +500,7 @@ def train_single_scale(generators, discriminators, opt):
                 else:
                     fake = generator(fake_prev.detach(), noise)
                     output = discriminator(fake)
-                print(fake.shape)
+
                 generator_error = -output.mean() * opt["alpha_2"]
                 generator_error.backward(retain_graph=True)
                 G_loss = output.mean().item()
@@ -512,13 +512,13 @@ def train_single_scale(generators, discriminators, opt):
             if(curr_size > max_dim):
                 opt_noise = opt["noise_amplitudes"][-1]*generator.optimal_noise
                 if(opt['mode'] == "2D"):
-                    optimal_reconstruction = generator(optimal_LR.detach()[:,:,starts[0]:ends[0],starts[1]:ends[1]].clone(), 
+                    optimal_reconstruction = generator(optimal_LR.detach()[:,:,starts[0]:ends[0],starts[1]:ends[1]], 
                     opt_noise[:,:,starts[0]:ends[0],starts[1]:ends[1]])
                 elif(opt['mode'] == "3D"):
-                    optimal_reconstruction = generator(optimal_LR.detach()[:,:,starts[0]:ends[0],starts[1]:ends[1],starts[2]:ends[2]].clone(), 
+                    optimal_reconstruction = generator(optimal_LR.detach()[:,:,starts[0]:ends[0],starts[1]:ends[1],starts[2]:ends[2]], 
                     opt_noise[:,:,starts[0]:ends[0],starts[1]:ends[1],starts[2]:ends[2]])
             else:
-                optimal_reconstruction = generator(optimal_LR.detach().clone(), 
+                optimal_reconstruction = generator(optimal_LR.detach(), 
                 opt["noise_amplitudes"][-1]*generator.optimal_noise)
             print(optimal_reconstruction.shape)
             

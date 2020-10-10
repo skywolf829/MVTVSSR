@@ -98,6 +98,7 @@ if __name__ == '__main__':
         os.path.join(opt["save_folder"], opt["save_name"]), "log.txt")
 
         generator, discriminator = train_single_scale(generators, discriminators, opt)
+        discriminator.to("cpu")
         generators.append(generator)
         discriminators.append(discriminator)
             
