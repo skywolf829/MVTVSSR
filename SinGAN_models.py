@@ -433,7 +433,7 @@ def train_single_scale(generators, discriminators, opt):
         G_loss = 0
         
         gradient_loss = 0
-        dim_s = 96
+        dim_s = 64
         max_dim = dim_s*dim_s*dim_s
         curr_size = opt["resolutions"][len(generators)][0]
         for z in range(1, len(opt["resolutions"][len(generators)])):
