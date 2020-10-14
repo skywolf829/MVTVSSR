@@ -438,7 +438,7 @@ def train_single_scale_wrapper(generators, discriminators, opt):
 def train_single_scale(generators, discriminators, opt):
             
     # Initialize the dataset
-    dataset = Dataset(os.path.join(input_folder, opt["training_folder"]), opt)
+    dataset = Dataset(os.path.join(input_folder, opt["data_folder"]), opt)
 
     torch.manual_seed(0)
     

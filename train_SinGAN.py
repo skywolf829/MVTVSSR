@@ -16,7 +16,6 @@ if __name__ == '__main__':
 
     parser.add_argument('--mode',default=None,help='The type of input - 2D, 3D')
     parser.add_argument('--data_folder',default=None,type=str,help='File to train on')
-    parser.add_argument('--testing_folder',default=None,type=str,help='File to validate on')
     parser.add_argument('--num_training_examples',default=None,type=int,help='Frames to use from training file')
     parser.add_argument('--save_folder',default=None, help='The folder to save the models folder into')
     parser.add_argument('--save_name',default=None, help='The name for the folder to save the model')
@@ -88,7 +87,7 @@ if __name__ == '__main__':
     start_time = time.time()
     print_to_log_and_console("Started training at " + str(now), 
     os.path.join(opt["save_folder"], opt["save_name"]), "log.txt")
-    opt["num_training_examples"] = len(os.listdir(os.path.join(input_folder,opt["training_folder"])))
+    opt["num_training_examples"] = len(os.listdir(os.path.join(input_folder,opt["data_folder"])))
 
     # Train each scale 1 by 1
     for i in range(opt["n"]):

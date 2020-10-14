@@ -131,8 +131,8 @@ sim_name, timestep, field, num_components, num_workers):
 
 frames = []
 
-name = "channel"
-#name = "isotropic1024coarse"
+#name = "channel"
+name = "isotropic1024coarse"
 t0 = time.time()
 count = 0
 endts = 2
@@ -149,7 +149,7 @@ for i in range(1, endts, ts_skip):
     #name,
     #str(count) + ".npy"), f[0].swapaxes(0,2).swapaxes(1,2).astype(np.float32))
     print(f.shape)
-    np.save("p.npy", f.astype(np.float32))
+    np.save("0.npy", f.astype(np.float32))
     count += 1
     frames.append(f[0])
 

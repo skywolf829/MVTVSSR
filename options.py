@@ -6,7 +6,7 @@ class Options():
         opt = {}
         # Input info
         opt["mode"]                    = "3D"      # What SinGAN to use - 2D or 3D
-        opt["training_folder"]         = "JHUturbulence/channel3D"
+        opt["data_folder"]             = "JHUturbulence/channel3D"
         opt["image_normalize"]         = False
         opt["scale_data"]              = False
         opt['scale_on_magnitude']      = True
