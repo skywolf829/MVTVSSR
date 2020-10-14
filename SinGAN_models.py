@@ -501,8 +501,7 @@ def train_single_scale(generators, discriminators, opt):
         real = real.to(opt['device'])
     torch.cuda.empty_cache()
 
-    dim_s = 64
-    max_dim = dim_s*dim_s*dim_s
+    max_dim = opt["patch_size"]*opt["patch_size"]*opt["patch_size"]
     curr_size = opt["resolutions"][len(generators)][0]
     for z in range(1, len(opt["resolutions"][len(generators)])):
         curr_size *= opt["resolutions"][len(generators)][z]
@@ -513,7 +512,8 @@ def train_single_scale(generators, discriminators, opt):
             if(curr_size <= max_dim):
                 optimal_LR = generate(generators, "reconstruct", opt, opt["device"]).detach()
             else:            
-                optimal_LR = generate_by_patch(generators, "reconstruct", opt, opt["device"], dim_s).detach()
+                optimal_LR = generate_by_patch(generators, "reconstruct", opt, 
+                opt["device"], opt["patch_size"]).detach()
         optimal_LR = F.interpolate(optimal_LR, size=opt["resolutions"][len(generators)],
         mode=opt["upsample_mode"])
         torch.cuda.empty_cache()        
@@ -530,7 +530,8 @@ def train_single_scale(generators, discriminators, opt):
         # Generate fake image
         with torch.no_grad():
             if(len(generators) > 0):
-                fake_prev = generate_by_patch(generators, "random", opt, opt["device"], dim_s)
+                fake_prev = generate_by_patch(generators, "random", opt, 
+                opt["device"], opt["patch_size"])
                 fake_prev = F.interpolate(fake_prev, size=opt["resolutions"][len(generators)],
                 mode=opt["upsample_mode"])
                 torch.cuda.empty_cache()
@@ -547,8 +548,8 @@ def train_single_scale(generators, discriminators, opt):
             starts = []
             ends = []
             for z in range(0, len(opt["resolutions"][len(generators)])):
-                starts.append(random.randrange(0, opt["resolutions"][len(generators)][z] - dim_s))
-                ends.append(starts[-1]+dim_s)
+                starts.append(random.randrange(0, opt["resolutions"][len(generators)][z] - opt["patch_size"]))
+                ends.append(starts[-1]+opt["patch_size"])
         
         if(curr_size > max_dim):
             if(opt['mode'] == "2D"):

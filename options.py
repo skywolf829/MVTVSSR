@@ -41,6 +41,7 @@ class Options():
         opt["save_generators"]         = True
         opt["save_discriminators"]     = True
         opt["physical_constraints"]    = "none"
+        opt["patch_size"]              = 96
 
         # GAN training info
         opt["alpha_1"]                 = 0       # Reconstruction loss coefficient
