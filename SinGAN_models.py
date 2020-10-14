@@ -198,9 +198,7 @@ def laplace_pyramid_downscale(frame, level, downscale_per_level, device):
         for i in range(level):
             s = (input_size * (downscale_per_level**(i+1))).astype(int)
             frame = F.conv3d(frame, gaussian_kernel, groups=frame.shape[1])
-            torch.cuda.empty_cache()
             frame = F.interpolate(frame, size = list(s), mode='nearest')
-            torch.cuda.empty_cache()
     del gaussian_kernel
     return frame
     
@@ -273,10 +271,8 @@ def generate(generators, mode, opt, device):
             elif(mode == "random"):
                 noise = torch.randn(generators[i].get_input_shape(), 
                 device=device)
-            torch.cuda.empty_cache()
             generated_image = generators[i](generated_image, 
             opt["noise_amplitudes"][i]*noise)
-            torch.cuda.empty_cache()
 
     return generated_image
 
@@ -310,12 +306,10 @@ def generate_by_patch(generators, mode, opt, device, patch_size):
                             elif(mode == "random"):
                                 noise = torch.randn([generated_image.shape[0], generated_image.shape[1],
                                 z_stop-z,y_stop-y,x_stop-x], device=device)
-                            torch.cuda.empty_cache()
                             
                             #print("[%i:%i, %i:%i, %i:%i]" % (z, z_stop, y, y_stop, x, x_stop))
                             result = generators[i](LR[:,:,z:z_stop,y:y_stop,x:x_stop], 
                             opt["noise_amplitudes"][i]*noise)
-                            torch.cuda.empty_cache()
 
                             x_offset = rf if x > 0 else 0
                             y_offset = rf if y > 0 else 0
@@ -325,7 +319,6 @@ def generate_by_patch(generators, mode, opt, device, patch_size):
                             z+z_offset:z+noise.shape[2],
                             y+y_offset:y+noise.shape[3],
                             x+x_offset:x+noise.shape[4]] = result[:,:,z_offset:,y_offset:,x_offset:]
-                            torch.cuda.empty_cache()
 
     return generated_image
 
@@ -499,7 +492,6 @@ def train_single_scale(generators, discriminators, opt):
             real = laplace_pyramid_downscale(real, len(opt['resolutions'])-len(generators)-1, opt['spatial_downscale_ratio'], opt['device'])
     else:
         real = real.to(opt['device'])
-    torch.cuda.empty_cache()
 
     max_dim = opt["patch_size"]*opt["patch_size"]*opt["patch_size"]
     curr_size = opt["resolutions"][len(generators)][0]
@@ -516,12 +508,10 @@ def train_single_scale(generators, discriminators, opt):
                 opt["device"], opt["patch_size"]).detach()
         optimal_LR = F.interpolate(optimal_LR, size=opt["resolutions"][len(generators)],
         mode=opt["upsample_mode"])
-        torch.cuda.empty_cache()        
         with torch.no_grad():
             criterion = nn.MSELoss().to(opt['device'])
             rmse = torch.sqrt(criterion(optimal_LR, real))
         opt["noise_amplitudes"][-1] = rmse.item()
-        torch.cuda.empty_cache()
     else:    
         optimal_LR = torch.zeros(generator.get_input_shape(), device=opt["device"])
     #writer.add_graph(generator, [optimal_LR, generator.optimal_noise])
@@ -534,11 +524,9 @@ def train_single_scale(generators, discriminators, opt):
                 opt["device"], opt["patch_size"])
                 fake_prev = F.interpolate(fake_prev, size=opt["resolutions"][len(generators)],
                 mode=opt["upsample_mode"])
-                torch.cuda.empty_cache()
             else:
                 fake_prev = torch.zeros(generator.get_input_shape()).to(opt["device"])
             fake_prev = fake_prev.detach()
-            torch.cuda.empty_cache()
         D_loss = 0
         G_loss = 0
         
@@ -615,7 +603,6 @@ def train_single_scale(generators, discriminators, opt):
                 generator_error.backward(retain_graph=True)
                 G_loss = output.mean().item()
 
-            torch.cuda.empty_cache()
             loss = nn.L1Loss().cuda(opt["device"])
             
             # Re-compute the constructed image
@@ -848,7 +835,6 @@ class SinGAN_Generator(nn.Module):
         noisePlusData = data + noise
         if(self.pre_padding):
             noisePlusData = F.pad(noisePlusData, self.required_padding)
-        torch.cuda.empty_cache()
         output = self.model(noisePlusData)
 
         if(self.physical_constraints == "hard"):
