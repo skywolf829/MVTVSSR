@@ -54,6 +54,7 @@ if __name__ == '__main__':
     parser.add_argument('--gamma',default=None, type=float,help='')
     parser.add_argument('--physical_constraints',default=None,type=str,help='none, soft, or hard')
     parser.add_argument('--patch_size',default=None, type=int,help='Patch size for inference')
+    parser.add_argument('--upsample_mode',default=None, type=str,help='Method for upsampling')
 
     parser.add_argument('--load_from',default=None, type=str,help='Load a model to continue training')
     parser.add_argument('--save_every',default=None, type=int,help='How often to save during training')
@@ -97,7 +98,7 @@ if __name__ == '__main__':
         print_to_log_and_console(str(datetime.datetime.now()) + " - Beginning training on scale " + str(len(generators)),
         os.path.join(opt["save_folder"], opt["save_name"]), "log.txt")
         #with profiler.profile(profile_memory=True, use_cuda=True, record_shapes=True) as prof:
-        generator, discriminator = train_single_scale_wrapper(generators, discriminators, opt)
+        generator, discriminator = train_single_scale(generators, discriminators, opt)
         #reporter = MemReporter()
         #reporter.report()
         discriminator.to("cpu")

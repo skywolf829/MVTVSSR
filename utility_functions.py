@@ -48,7 +48,7 @@ def bilinear_interpolate(im, x, y):
     wd = (x-x0.type(dtype)) * (y-y0.type(dtype))
     return Ia*wa + Ib*wb + Ic*wc + Id*wd
 
-def lagrangian_transport(VF, x_res, y_res, time_length, ts_per_sec):
+def lagrangian_transport(VF, x_res, y_res, time_length, ts_per_sec, device):
     #x = torch.arange(-1, 1, int(VF.shape[2] / x_res), dtype=torch.float32).unsqueeze(1).expand([int(VF.shape[2] / x_res), int(VF.shape[3] / y_res)]).unsqueeze(0)
 
     x = torch.arange(0, VF.shape[2], int(VF.shape[2] / x_res), dtype=torch.float32).view(1, -1).repeat([x_res, 1])
@@ -58,7 +58,7 @@ def lagrangian_transport(VF, x_res, y_res, time_length, ts_per_sec):
     y = y.view(1, x_res,y_res)
     particles = torch.cat([x, y],axis=0)
     particles = torch.reshape(particles, [2, -1]).transpose(0,1)
-    particles = particles.to("cuda")
+    particles = particles.to(device)
     #print(particles)
     particles_over_time = []
     
@@ -68,8 +68,8 @@ def lagrangian_transport(VF, x_res, y_res, time_length, ts_per_sec):
         start_t = time.time()
         flow = bilinear_interpolate(VF, particles[:,0], particles[:,1])
         particles[:] += flow[0:2, :].permute(1,0) * (1 / ts_per_sec)
-        particles[:] += torch.tensor(list(VF.shape[2:])).to("cuda")
-        particles[:] %= torch.tensor(list(VF.shape[2:])).to("cuda")
+        particles[:] += torch.tensor(list(VF.shape[2:])).to(device)
+        particles[:] %= torch.tensor(list(VF.shape[2:])).to(device)
     particles_over_time.append(particles)
     
     return particles_over_time
@@ -147,9 +147,9 @@ def to_vort(vectorField, normalize=True, device=None):
         vorts = torch.cat([zdy-ydz, xdz-zdx, ydx-xdy], axis=0)
         return vorts
 
-def feature_distance(img1, img2):
+def feature_distance(img1, img2, device):
     if(features_model is None):
-        model = models.vgg19(pretrained=True).to(device="cuda")
+        model = models.vgg19(pretrained=True).to(device=device)
         model.eval()
         layer = model.features
 
@@ -161,10 +161,10 @@ def feature_distance(img1, img2):
     if(img2.shape[1] == 1):
         img2 = np.repeat(img2, 3, axis=1)
 
-    img1_tensor = np2torch(img1, device="cuda")
+    img1_tensor = np2torch(img1, device=device)
     img1_feature_vector = layer(img1_tensor).cpu().detach().numpy()
 
-    img2_tensor = np2torch(img2, device="cuda")
+    img2_tensor = np2torch(img2, device=device)
     img2_feature_vector = layer(img2_tensor).cpu().detach().numpy()
     
     return np.mean((img1_feature_vector - img2_feature_vector) ** 2)
@@ -307,18 +307,18 @@ class GaussianSmoothing(nn.Module):
         return self.conv(input, weight=self.weight, groups=self.groups)
 
 # https://discuss.pytorch.org/t/how-to-calculate-the-gradient-of-images/1407/4
-def compute_gradients(input_frame):
+def compute_gradients(input_frame, device):
     # X gradient filter
     x_gradient_filter = torch.Tensor([[1, 0, -1],
     [2, 0, -2],
-    [1, 0, -1]]).cuda()
+    [1, 0, -1]]).to(device)
 
     x_gradient_filter = x_gradient_filter.view((1,1,3,3))
     G_x = F.conv2d(input_frame, x_gradient_filter, padding=1)
 
     y_gradient_filter = torch.Tensor([[1, 2, 1],
     [0, 0, 0],
-    [-1, -2, -1]]).cuda()
+    [-1, -2, -1]]).to(device)
 
     y_gradient_filter = y_gradient_filter.view((1,1,3,3))
     G_y = F.conv2d(input_frame, y_gradient_filter, padding=1)
@@ -329,7 +329,7 @@ def compute_laplacian(input_frame):
     # X gradient filter
     laplacian_filter = torch.Tensor([[0, 1, 0],
     [1, -4, 1],
-    [0, 1, 0]]).cuda()
+    [0, 1, 0]]).to(device)
 
     laplacian_filter = laplacian_filter.view((1,1,3,3))
     laplacian = F.conv2d(input_frame, laplacian_filter, padding=1)

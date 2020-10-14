@@ -170,8 +170,39 @@ def mag_difference(t1, t2):
     '''
     return mag_diff
 
-def laplace_pyramid_downscale(frame, level, downscale_per_level, device):
-    kernel_size = 15
+def laplace_pyramid_downscale2D(frame, level, downscale_per_level, device):
+    kernel_size = 5
+    sigma = 2 * (1 / downscale_per_level) / 6
+
+    x_cord = torch.arange(kernel_size)
+    x_grid = x_cord.repeat(kernel_size).view(kernel_size, kernel_size)
+    y_grid = torch.transpose(x_grid, 0, 1)
+    
+    xy_grid = torch.stack([x_grid, y_grid], dim=-1)
+    mean = (kernel_size - 1)/2.
+    variance = sigma**2.
+    gaussian_kernel = (1./(2.*math.pi*variance)) *\
+                  torch.exp(
+                      -torch.sum((xy_grid - mean)**2., dim=-1) /\
+                      (2*variance)
+                  )
+    # Make sure sum of values in gaussian kernel equals 1.
+    gaussian_kernel = gaussian_kernel / torch.sum(gaussian_kernel)
+
+    # Reshape to 2d depthwise convolutional weight
+    gaussian_kernel = gaussian_kernel.view(1, 1, kernel_size, kernel_size).to(device)
+    gaussian_kernel = gaussian_kernel.repeat(frame.shape[1], 1, 1, 1)
+    input_size = np.array(list(frame.shape[2:]))
+    with torch.no_grad():
+        for i in range(level):
+            s = (input_size * (downscale_per_level**(i+1))).astype(int)
+            frame = F.conv2d(frame, gaussian_kernel, groups=frame.shape[1])
+            frame = F.interpolate(frame, size = list(s), mode='nearest')
+    del gaussian_kernel
+    return frame
+
+def laplace_pyramid_downscale3D(frame, level, downscale_per_level, device):
+    kernel_size = 5
     sigma = 2 * (1 / downscale_per_level) / 6
 
     x_cord = torch.arange(kernel_size)
@@ -278,6 +309,7 @@ def generate(generators, mode, opt, device):
 
 def generate_by_patch(generators, mode, opt, device, patch_size):
     with torch.no_grad():
+        #seq = []
         generated_image = torch.zeros(generators[0].get_input_shape()).to(device)
         
         for i in range(0, len(generators)):
@@ -288,7 +320,32 @@ def generate_by_patch(generators, mode, opt, device, patch_size):
             size=generators[i].resolution, mode=opt["upsample_mode"])
             generated_image = torch.zeros(generators[i].get_input_shape()).to(device)
             if(opt['mode'] == "2D"):
-                print("TBI")
+                for y in range(0,generated_image.shape[2], patch_size-2*rf):
+                    y = min(y, max(0, generated_image.shape[2] - patch_size))
+                    y_stop = min(generated_image.shape[2], y + patch_size)
+
+                    for x in range(0,generated_image.shape[3], patch_size-2*rf):
+                        x = min(x, max(0, generated_image.shape[3] - patch_size))
+                        x_stop = min(generated_image.shape[3], x + patch_size)
+                        #if(i == len(generators) - 1):
+                        #    seq.append(generated_image.detach().cpu().numpy()[0].swapaxes(0,2).swapaxes(0,1))
+                        if(mode == "reconstruct"):
+                            noise = generators[i].optimal_noise[:,:,y:y_stop,x:x_stop]
+                        elif(mode == "random"):
+                            noise = torch.randn([generated_image.shape[0], generated_image.shape[1],
+                            y_stop-y,x_stop-x], device=device)
+                        
+                        #print("[%i:%i, %i:%i, %i:%i]" % (z, z_stop, y, y_stop, x, x_stop))
+                        result = generators[i](LR[:,:,y:y_stop,x:x_stop], 
+                        opt["noise_amplitudes"][i]*noise)
+
+                        x_offset = rf if x > 0 else 0
+                        y_offset = rf if y > 0 else 0
+
+                        generated_image[:,:,
+                        y+y_offset:y+noise.shape[2],
+                        x+x_offset:x+noise.shape[3]] = result[:,:,y_offset:,x_offset:]
+
             elif(opt['mode'] == '3D'):
                 for z in range(0,generated_image.shape[2], patch_size-2*rf):
                     z = min(z, max(0, generated_image.shape[2] - patch_size))
@@ -319,7 +376,8 @@ def generate_by_patch(generators, mode, opt, device, patch_size):
                             z+z_offset:z+noise.shape[2],
                             y+y_offset:y+noise.shape[3],
                             x+x_offset:x+noise.shape[4]] = result[:,:,z_offset:,y_offset:,x_offset:]
-
+    #seq.append(generated_image.detach().cpu().numpy()[0].swapaxes(0,2).swapaxes(0,1))
+    #imageio.mimwrite("patches.gif", seq)
     return generated_image
 
 def super_resolution(generator, frame, factor, opt, device):
@@ -464,10 +522,7 @@ def train_single_scale(generators, discriminators, opt):
     discriminator_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer=discriminator_optimizer,
     milestones=[1600],gamma=opt['gamma'])
  
-    writer = SummaryWriter(os.path.join('tensorboard',
-    "%.02fsdr_pc%s_a1%0.02f_a2%0.02f_a3%0.02f_a4%0.02f_a5%0.2f" % 
-    (opt["spatial_downscale_ratio"], opt["physical_constraints"], opt['alpha_1'], opt['alpha_2'], 
-    opt['alpha_3'], opt['alpha_4'], opt["alpha_5"])))
+    writer = SummaryWriter(os.path.join('tensorboard',opt['save_name']))
 
     start_time = time.time()
     next_save = 0
@@ -480,20 +535,26 @@ def train_single_scale(generators, discriminators, opt):
     
     if(len(generators) + 1 is not len(opt["resolutions"])):
         if(opt['mode'] == '2D'):
-            real = pyramid_reduce(real[0].cpu().numpy().swapaxes(0,2).swapaxes(0,1), 
-            downscale = (1 / opt["spatial_downscale_ratio"])**(len(opt["resolutions"]) - len(generators)-1),
-            multichannel=True).astype(np.float32).swapaxes(0,1).swapaxes(0,2)
-            real = np2torch(real, device=opt["device"]).unsqueeze(0)
+            #real = pyramid_reduce(real[0].cpu().numpy().swapaxes(0,2).swapaxes(0,1), 
+            #downscale = (1 / opt["spatial_downscale_ratio"])**(len(opt["resolutions"]) - len(generators)-1),
+            #multichannel=True).astype(np.float32).swapaxes(0,1).swapaxes(0,2)
+            #real = np2torch(real, device=opt["device"]).unsqueeze(0)
+            real = laplace_pyramid_downscale2D(real, len(opt['resolutions'])-len(generators)-1, opt['spatial_downscale_ratio'], opt['device'])
+
 
         elif(opt['mode'] == "3D"):
             #real = pyramid_reduce(real[0].cpu().numpy().swapaxes(2,1).swapaxes(2,3).swapaxes(3,0), 
             #downscale = (1 / opt["spatial_downscale_ratio"])**(len(opt["resolutions"]) - len(generators)-1),
             #multichannel=True).astype(np.float32).swapaxes(0,3).swapaxes(3,2).swapaxes(2,1)
-            real = laplace_pyramid_downscale(real, len(opt['resolutions'])-len(generators)-1, opt['spatial_downscale_ratio'], opt['device'])
+            real = laplace_pyramid_downscale3D(real, len(opt['resolutions'])-len(generators)-1, opt['spatial_downscale_ratio'], opt['device'])
     else:
         real = real.to(opt['device'])
 
-    max_dim = opt["patch_size"]*opt["patch_size"]*opt["patch_size"]
+    if(opt['mode'] == '3D'):
+        max_dim = opt["patch_size"]*opt["patch_size"]*opt["patch_size"]
+    elif(opt['mode'] == '2D'):
+        max_dim = opt["patch_size"]*opt["patch_size"]
+
     curr_size = opt["resolutions"][len(generators)][0]
     for z in range(1, len(opt["resolutions"][len(generators)])):
         curr_size *= opt["resolutions"][len(generators)][z]
@@ -603,7 +664,7 @@ def train_single_scale(generators, discriminators, opt):
                 generator_error.backward(retain_graph=True)
                 G_loss = output.mean().item()
 
-            loss = nn.L1Loss().cuda(opt["device"])
+            loss = nn.L1Loss().to(opt["device"])
             
             # Re-compute the constructed image
             if(curr_size > max_dim):
