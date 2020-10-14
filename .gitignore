@@ -129,6 +129,7 @@ dmypy.json
 *.png
 *.gif
 *.out
+*.nc
 nohup.out
 
 /SavedModels
