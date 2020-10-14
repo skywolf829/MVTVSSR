@@ -240,7 +240,7 @@ def init_scales(opt, dataset):
         print("Scale %i: %s" % (opt["n"] - 1 - i, str(scaling)))
 
 def init_gen(scale, opt):
-    num_kernels = int( 2** ((math.log(opt["base_num_kernels"]) / math.log(2)) + (scale / 6)))
+    num_kernels = int( 2** ((math.log(opt["base_num_kernels"]) / math.log(2)) + (scale / 4)))
 
     generator = SinGAN_Generator(opt["resolutions"][scale], opt["num_blocks"], 
     opt["num_channels"], num_kernels, opt["kernel_size"], opt["stride"], 
@@ -251,7 +251,7 @@ def init_gen(scale, opt):
     return generator, num_kernels
 
 def init_discrim(scale, opt):
-    num_kernels = int(2 ** ((math.log(opt["base_num_kernels"]) / math.log(2)) + (scale / 6)))
+    num_kernels = int(2 ** ((math.log(opt["base_num_kernels"]) / math.log(2)) + (scale / 4)))
 
     discriminator = SinGAN_Discriminator(opt["resolutions"][scale], 
     opt["num_blocks"], opt["num_channels"], num_kernels, opt["kernel_size"], 
