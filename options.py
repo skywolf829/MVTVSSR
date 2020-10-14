@@ -48,8 +48,8 @@ class Options():
         opt["alpha_3"]                 = 0        # Soft physical loss coefficient
         opt["alpha_4"]                 = 10       # mag_and_angle loss
         opt["alpha_5"]                 = 1          # first derivative loss coeff
-        opt["generator_steps"]         = 3
-        opt["discriminator_steps"]     = 3
+        opt["generator_steps"]         = 1
+        opt["discriminator_steps"]     = 1
         opt["epochs"]                  = 2000
         opt["minibatch"]               = 1        # Minibatch for training
         opt["num_workers"]             = 0

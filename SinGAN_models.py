@@ -22,6 +22,7 @@ from math import pi
 from skimage.transform.pyramids import pyramid_reduce
 from torch.utils.tensorboard import SummaryWriter
 import copy
+from pytorch_memlab import LineProfiler, MemReporter, profile, profile_every
 
 MVTVSSR_folder_path = os.path.dirname(os.path.abspath(__file__))
 input_folder = os.path.join(MVTVSSR_folder_path, "InputData")
@@ -43,12 +44,12 @@ def reset_grads(model,require_grad):
 
 def TAD(field, device):
     if(field.shape[1] == 2):
-        tx = spatial_derivative2D(field[:,0:1,:,:], 0, device)
-        ty = spatial_derivative2D(field[:,1:2,:,:], 1, device)
+        tx = spatial_derivative2D(field[:,0:1,:,:], 1, device)
+        ty = spatial_derivative2D(field[:,1:2,:,:], 0, device)
         g = torch.abs(tx + ty)
     elif(field.shape[1] == 3):
-        tx = spatial_derivative2D(field[:,0:1,:,:], 0, device)
-        ty = spatial_derivative2D(field[:,1:2,:,:], 1, device)
+        tx = spatial_derivative2D(field[:,0:1,:,:], 1, device)
+        ty = spatial_derivative2D(field[:,1:2,:,:], 0, device)
         g = torch.abs(tx + ty)
     return g
 
@@ -65,6 +66,7 @@ def TAD3D_CD(field, device):
     tz = spatial_derivative3D_CD(field[:,2:3,:,:,:], 0, device)
     g = torch.abs(tx + ty + tz)
     return g
+
 def spatial_derivative2D(field, axis, device):
     m = nn.ReplicationPad2d(1)
     if(axis == 0):
@@ -168,6 +170,40 @@ def mag_difference(t1, t2):
     '''
     return mag_diff
 
+def laplace_pyramid_downscale(frame, level, downscale_per_level, device):
+    kernel_size = 15
+    sigma = 2 * (1 / downscale_per_level) / 6
+
+    x_cord = torch.arange(kernel_size)
+    x_grid = x_cord.repeat(kernel_size).repeat(kernel_size).view(kernel_size, kernel_size, kernel_size)
+    y_grid = torch.transpose(x_grid, 0, 1)
+    z_grid = torch.transpose(x_grid, 0, 2)
+    
+    xyz_grid = torch.stack([x_grid, y_grid, z_grid], dim=-1)
+    mean = (kernel_size - 1)/2.
+    variance = sigma**2.
+    gaussian_kernel = (1./(2.*math.pi*variance)) *\
+                  torch.exp(
+                      -torch.sum((xyz_grid - mean)**2., dim=-1) /\
+                      (2*variance)
+                  )
+    # Make sure sum of values in gaussian kernel equals 1.
+    gaussian_kernel = gaussian_kernel / torch.sum(gaussian_kernel)
+
+    # Reshape to 2d depthwise convolutional weight
+    gaussian_kernel = gaussian_kernel.view(1, 1, kernel_size, kernel_size, kernel_size).to(device)
+    gaussian_kernel = gaussian_kernel.repeat(frame.shape[1], 1, 1, 1, 1)
+    input_size = np.array(list(frame.shape[2:]))
+    with torch.no_grad():
+        for i in range(level):
+            s = (input_size * (downscale_per_level**(i+1))).astype(int)
+            frame = F.conv3d(frame, gaussian_kernel, groups=frame.shape[1])
+            torch.cuda.empty_cache()
+            frame = F.interpolate(frame, size = list(s), mode='nearest')
+            torch.cuda.empty_cache()
+    del gaussian_kernel
+    return frame
+    
 def l2normalize(v, eps=1e-12):
     return v / (v.norm() + eps)
 
@@ -195,9 +231,9 @@ def init_scales(opt, dataset):
     print("The model will have %i scales" % (opt["n"]))
     for i in range(opt["n"]):
         scaling = []
-        factor =  1 / (1 / opt["spatial_downscale_ratio"])**(opt["n"] - i - 1)
+        factor =  opt["spatial_downscale_ratio"]**(opt["n"] - i - 1)
         for j in range(len(dataset.resolution)):
-            x = math.ceil(dataset.resolution[j] * factor)
+            x = int(dataset.resolution[j] * factor)
             scaling.append(x)
         #opt["resolutions"].insert(0, scaling)
         opt["resolutions"].append(scaling)
@@ -225,20 +261,71 @@ def init_discrim(scale, opt):
     return discriminator
 
 def generate(generators, mode, opt, device):
-    generated_image = torch.zeros(generators[0].get_input_shape()).to(device)
-    
-    for i in range(0, len(generators)):
-        generated_image = F.interpolate(generated_image, 
-        size=generators[i].resolution, mode=opt["upsample_mode"])
+    with torch.no_grad():
+        generated_image = torch.zeros(generators[0].get_input_shape()).to(device)
         
-        if(mode == "reconstruct"):
-            noise = generators[i].optimal_noise
-        elif(mode == "random"):
-            noise = torch.randn(generators[i].get_input_shape(), 
-            device=device)
+        for i in range(0, len(generators)):
+            generated_image = F.interpolate(generated_image, 
+            size=generators[i].resolution, mode=opt["upsample_mode"])
+            
+            if(mode == "reconstruct"):
+                noise = generators[i].optimal_noise
+            elif(mode == "random"):
+                noise = torch.randn(generators[i].get_input_shape(), 
+                device=device)
+            torch.cuda.empty_cache()
+            generated_image = generators[i](generated_image, 
+            opt["noise_amplitudes"][i]*noise)
+            torch.cuda.empty_cache()
 
-        generated_image = generators[i](generated_image, 
-        opt["noise_amplitudes"][i]*noise)
+    return generated_image
+
+def generate_by_patch(generators, mode, opt, device, patch_size):
+    with torch.no_grad():
+        generated_image = torch.zeros(generators[0].get_input_shape()).to(device)
+        
+        for i in range(0, len(generators)):
+            #print("Gen " + str(i))
+            rf = int(generators[i].receptive_field() / 2)
+            
+            LR = F.interpolate(generated_image, 
+            size=generators[i].resolution, mode=opt["upsample_mode"])
+            generated_image = torch.zeros(generators[i].get_input_shape()).to(device)
+            if(opt['mode'] == "2D"):
+                print("TBI")
+            elif(opt['mode'] == '3D'):
+                for z in range(0,generated_image.shape[2], patch_size-2*rf):
+                    z = min(z, max(0, generated_image.shape[2] - patch_size))
+                    z_stop = min(generated_image.shape[2], z + patch_size)
+                    for y in range(0,generated_image.shape[3], patch_size-2*rf):
+                        y = min(y, max(0, generated_image.shape[3] - patch_size))
+                        y_stop = min(generated_image.shape[3], y + patch_size)
+
+                        for x in range(0,generated_image.shape[4], patch_size-2*rf):
+                            x = min(x, max(0, generated_image.shape[4] - patch_size))
+                            x_stop = min(generated_image.shape[4], x + patch_size)
+
+                            if(mode == "reconstruct"):
+                                noise = generators[i].optimal_noise[:,:,z:z_stop,y:y_stop,x:x_stop]
+                            elif(mode == "random"):
+                                noise = torch.randn([generated_image.shape[0], generated_image.shape[1],
+                                z_stop-z,y_stop-y,x_stop-x], device=device)
+                            torch.cuda.empty_cache()
+                            
+                            #print("[%i:%i, %i:%i, %i:%i]" % (z, z_stop, y, y_stop, x, x_stop))
+                            result = generators[i](LR[:,:,z:z_stop,y:y_stop,x:x_stop], 
+                            opt["noise_amplitudes"][i]*noise)
+                            torch.cuda.empty_cache()
+
+                            x_offset = rf if x > 0 else 0
+                            y_offset = rf if y > 0 else 0
+                            z_offset = rf if z > 0 else 0
+
+                            generated_image[:,:,
+                            z+z_offset:z+noise.shape[2],
+                            y+y_offset:y+noise.shape[3],
+                            x+x_offset:x+noise.shape[4]] = result[:,:,z_offset:,y_offset:,x_offset:]
+                            torch.cuda.empty_cache()
 
     return generated_image
 
@@ -342,6 +429,12 @@ def load_models(opt, device):
     
     return  generators, discriminators
 
+def train_single_scale_wrapper(generators, discriminators, opt):
+    with LineProfiler(train_single_scale, generate, generate_by_patch, SinGAN_Generator.forward) as prof:
+        g, d = train_single_scale(generators, discriminators, opt)
+    print(prof.display())
+    return g, d
+
 def train_single_scale(generators, discriminators, opt):
             
     # Initialize the dataset
@@ -361,8 +454,8 @@ def train_single_scale(generators, discriminators, opt):
     generator = generator.to(opt["device"])
     discriminator = init_discrim(len(generators), opt).to(opt["device"])
 
-    print_to_log_and_console(generator, os.path.join(opt["save_folder"], opt["save_name"]),
-        "log.txt")
+    #print_to_log_and_console(generator, os.path.join(opt["save_folder"], opt["save_name"]),
+    #    "log.txt")
     print_to_log_and_console("Training on %s" % (opt["device"]), 
         os.path.join(opt["save_folder"], opt["save_name"]), "log.txt")
     print_to_log_and_console("Kernels this scale: %i" % num_kernels_this_scale, 
@@ -390,54 +483,66 @@ def train_single_scale(generators, discriminators, opt):
     # Get properly sized frame for this generator
     real = dataset.__getitem__(0)
     real = real.to(opt["device"])
-    
     print(str(len(generators)) + ": " + str(opt["resolutions"][len(generators)]))
     
     if(len(generators) + 1 is not len(opt["resolutions"])):
         if(opt['mode'] == '2D'):
-            real = pyramid_reduce(real[0].clone().cpu().numpy().swapaxes(0,2).swapaxes(0,1), 
+            real = pyramid_reduce(real[0].cpu().numpy().swapaxes(0,2).swapaxes(0,1), 
             downscale = (1 / opt["spatial_downscale_ratio"])**(len(opt["resolutions"]) - len(generators)-1),
-            multichannel=True).swapaxes(0,1).swapaxes(0,2)
+            multichannel=True).astype(np.float32).swapaxes(0,1).swapaxes(0,2)
+            real = np2torch(real, device=opt["device"]).unsqueeze(0)
+
         elif(opt['mode'] == "3D"):
-            abc = real[0].clone().cpu().numpy().swapaxes(2,1).swapaxes(2,3).swapaxes(3,0)
-            real = pyramid_reduce(abc, 
-            downscale = (1 / opt["spatial_downscale_ratio"])**(len(opt["resolutions"]) - len(generators)-1),
-            multichannel=True)
-            real = real.swapaxes(0,3).swapaxes(3,2).swapaxes(2,1)
-        real = np2torch(real, device=opt["device"]).unsqueeze(0)
-    
-    
-    optimal_LR = torch.zeros(generator.get_input_shape(), device=opt["device"])
+            #real = pyramid_reduce(real[0].cpu().numpy().swapaxes(2,1).swapaxes(2,3).swapaxes(3,0), 
+            #downscale = (1 / opt["spatial_downscale_ratio"])**(len(opt["resolutions"]) - len(generators)-1),
+            #multichannel=True).astype(np.float32).swapaxes(0,3).swapaxes(3,2).swapaxes(2,1)
+            real = laplace_pyramid_downscale(real, len(opt['resolutions'])-len(generators)-1, opt['spatial_downscale_ratio'], opt['device'])
+    else:
+        real = real.to(opt['device'])
+    torch.cuda.empty_cache()
+
+    dim_s = 64
+    max_dim = dim_s*dim_s*dim_s
+    curr_size = opt["resolutions"][len(generators)][0]
+    for z in range(1, len(opt["resolutions"][len(generators)])):
+        curr_size *= opt["resolutions"][len(generators)][z]
+
     opt["noise_amplitudes"].append(1.0)
     if(len(generators) > 0):
         with torch.no_grad():
-            optimal_LR = generate(generators, "reconstruct", opt, opt["device"])
+            if(curr_size <= max_dim):
+                optimal_LR = generate(generators, "reconstruct", opt, opt["device"]).detach()
+            else:            
+                optimal_LR = generate_by_patch(generators, "reconstruct", opt, opt["device"], dim_s).detach()
         optimal_LR = F.interpolate(optimal_LR, size=opt["resolutions"][len(generators)],
         mode=opt["upsample_mode"])
-        rmse = torch.sqrt(torch.mean((optimal_LR - real)**2))
+        torch.cuda.empty_cache()        
+        with torch.no_grad():
+            criterion = nn.MSELoss().to(opt['device'])
+            rmse = torch.sqrt(criterion(optimal_LR, real))
         opt["noise_amplitudes"][-1] = rmse.item()
-    
+        torch.cuda.empty_cache()
+    else:    
+        optimal_LR = torch.zeros(generator.get_input_shape(), device=opt["device"])
     #writer.add_graph(generator, [optimal_LR, generator.optimal_noise])
 
-    for epoch in range(opt["epochs"]):        
+    for epoch in range(opt["epochs"]):
         # Generate fake image
         with torch.no_grad():
             if(len(generators) > 0):
-                fake_prev = generate(generators, "random", opt, opt["device"])
+                fake_prev = generate_by_patch(generators, "random", opt, opt["device"], dim_s)
                 fake_prev = F.interpolate(fake_prev, size=opt["resolutions"][len(generators)],
                 mode=opt["upsample_mode"])
+                torch.cuda.empty_cache()
             else:
                 fake_prev = torch.zeros(generator.get_input_shape()).to(opt["device"])
             fake_prev = fake_prev.detach()
+            torch.cuda.empty_cache()
         D_loss = 0
         G_loss = 0
         
         gradient_loss = 0
-        dim_s = 64
-        max_dim = dim_s*dim_s*dim_s
-        curr_size = opt["resolutions"][len(generators)][0]
-        for z in range(1, len(opt["resolutions"][len(generators)])):
-            curr_size *= opt["resolutions"][len(generators)][z]
+        
         if(curr_size > max_dim):
             starts = []
             ends = []
@@ -456,15 +561,18 @@ def train_single_scale(generators, discriminators, opt):
         # Update discriminator: maximize D(x) + D(G(z))
         if(opt["alpha_2"] > 0.0):            
             for j in range(opt["discriminator_steps"]):
-                noise = opt["noise_amplitudes"][-1] * torch.randn(generator.get_input_shape()).to(opt["device"])
                 if(curr_size > max_dim):
                     if(opt['mode'] == "2D"):
-                        fake = generator(fake_prev.detach()[:,:,starts[0]:ends[0],starts[1]:ends[1]],
-                        noise[:,:,starts[0]:ends[0],starts[1]:ends[1]])
+                        fake_prev_view = fake_prev.detach()[:,:,starts[0]:ends[0],starts[1]:ends[1]]
+                        noise = opt["noise_amplitudes"][-1] * torch.randn(fake_prev_view.shape).to(opt["device"])
+                        fake = generator(fake_prev_view,noise)
+                        
                     elif(opt['mode'] == "3D"):
-                        fake = generator(fake_prev.detach()[:,:,starts[0]:ends[0],starts[1]:ends[1],starts[2]:ends[2]],
-                        noise[:,:,starts[0]:ends[0],starts[1]:ends[1],starts[2]:ends[2]])
+                        fake_prev_view = fake_prev.detach()[:,:,starts[0]:ends[0],starts[1]:ends[1],starts[2]:ends[2]]
+                        noise = opt["noise_amplitudes"][-1] * torch.randn(fake_prev_view.shape).to(opt["device"])
+                        fake = generator(fake_prev_view,noise)
                 else:
+                    noise = opt["noise_amplitudes"][-1] * torch.randn(generator.get_input_shape()).to(opt["device"])
                     fake = generator(fake_prev.detach(), noise)
                 D_loss = 0
                 # Train with real downscaled to this scale
@@ -487,15 +595,16 @@ def train_single_scale(generators, discriminators, opt):
         for j in range(opt["generator_steps"]):
             generator.zero_grad()            
             if opt["alpha_2"] > 0.0:
-                noise = opt["noise_amplitudes"][-1] * torch.randn(generator.get_input_shape()).to(opt["device"])
                 if(curr_size > max_dim):
                     if(opt['mode'] == "2D"):
-                        fake = generator(fake_prev.detach()[:,:,starts[0]:ends[0],starts[1]:ends[1]],
-                        noise[:,:,starts[0]:ends[0],starts[1]:ends[1]])
+                        fake_prev_view = fake_prev.detach()[:,:,starts[0]:ends[0],starts[1]:ends[1]]
+                        noise = opt["noise_amplitudes"][-1] * torch.randn(fake_prev_view.shape).to(opt["device"])
+                        fake = generator(fake_prev_view, noise)
                         output = discriminator(fake)
                     elif(opt['mode'] == "3D"):
-                        fake = generator(fake_prev.detach()[:,:,starts[0]:ends[0],starts[1]:ends[1],starts[2]:ends[2]],
-                        noise[:,:,starts[0]:ends[0],starts[1]:ends[1],starts[2]:ends[2]])
+                        fake_prev_view = fake_prev.detach()[:,:,starts[0]:ends[0],starts[1]:ends[1],starts[2]:ends[2]]
+                        noise = opt["noise_amplitudes"][-1] * torch.randn(fake_prev_view.shape).to(opt["device"])
+                        fake = generator(fake_prev_view, noise)
                         output = discriminator(fake)
                 else:
                     fake = generator(fake_prev.detach(), noise)
@@ -505,22 +614,22 @@ def train_single_scale(generators, discriminators, opt):
                 generator_error.backward(retain_graph=True)
                 G_loss = output.mean().item()
 
-
+            torch.cuda.empty_cache()
             loss = nn.L1Loss().cuda(opt["device"])
             
             # Re-compute the constructed image
             if(curr_size > max_dim):
-                opt_noise = opt["noise_amplitudes"][-1]*generator.optimal_noise
                 if(opt['mode'] == "2D"):
+                    opt_noise = opt["noise_amplitudes"][-1]*generator.optimal_noise[:,:,starts[0]:ends[0],starts[1]:ends[1]]
                     optimal_reconstruction = generator(optimal_LR.detach()[:,:,starts[0]:ends[0],starts[1]:ends[1]], 
-                    opt_noise[:,:,starts[0]:ends[0],starts[1]:ends[1]])
+                    opt_noise)
                 elif(opt['mode'] == "3D"):
+                    opt_noise = opt["noise_amplitudes"][-1]*generator.optimal_noise[:,:,starts[0]:ends[0],starts[1]:ends[1],starts[2]:ends[2]]
                     optimal_reconstruction = generator(optimal_LR.detach()[:,:,starts[0]:ends[0],starts[1]:ends[1],starts[2]:ends[2]], 
-                    opt_noise[:,:,starts[0]:ends[0],starts[1]:ends[1],starts[2]:ends[2]])
+                    opt_noise)
             else:
                 optimal_reconstruction = generator(optimal_LR.detach(), 
                 opt["noise_amplitudes"][-1]*generator.optimal_noise)
-            print(optimal_reconstruction.shape)
             
             g = 0
             if(opt['mode'] == "2D"):
@@ -572,11 +681,11 @@ def train_single_scale(generators, discriminators, opt):
             generator_optimizer.step()
 
         if epoch == 0:
-            noise_numpy = opt["noise_amplitudes"][-1]*generator.optimal_noise.clone().detach().cpu().numpy()[0]
+            noise_numpy = opt["noise_amplitudes"][-1]*generator.optimal_noise.detach().cpu().numpy()[0]
             noise_cm = toImg(noise_numpy)
             writer.add_image("noise/%i"%len(generators), 
             noise_cm, epoch)            
-            real_numpy = real.clone().detach().cpu().numpy()[0]
+            real_numpy = real.detach().cpu().numpy()[0]
             real_cm = toImg(real_numpy)
             writer.add_image("real/%i"%len(generators), 
             real_cm, epoch)
@@ -584,13 +693,13 @@ def train_single_scale(generators, discriminators, opt):
             
 
         if(epoch % 50 == 0):
-            rec_numpy = optimal_reconstruction.clone().detach().cpu().numpy()[0]
+            rec_numpy = optimal_reconstruction.detach().cpu().numpy()[0]
             rec_cm = toImg(rec_numpy)
             writer.add_image("reconstructed/%i"%len(generators), 
             rec_cm, epoch)
 
             if(opt["alpha_2"] > 0.0):
-                fake_numpy = fake.clone().detach().cpu().numpy()[0]
+                fake_numpy = fake.detach().cpu().numpy()[0]
                 fake_cm = toImg(fake_numpy)
                 writer.add_image("fake/%i"%len(generators), 
                 fake_cm, epoch)
@@ -606,7 +715,7 @@ def train_single_scale(generators, discriminators, opt):
                 g_cm = toImg(g_map.detach().cpu().numpy()[0])
                 writer.add_image("Divergence/%i"%len(generators), 
                 g_cm, epoch)
-        
+
         print_to_log_and_console("%i/%i: Dloss=%.02f Gloss=%.02f L1=%.04f TAD=%.02f AMD=%.02f AAD=%.02f" %
         (epoch, opt['epochs'], D_loss, G_loss, rec_loss, g, mags.mean(), angles.mean()), 
         os.path.join(opt["save_folder"], opt["save_name"]), "log.txt")
@@ -636,6 +745,8 @@ class SinGAN_Generator(nn.Module):
         self.pre_padding = pre_padding
         self.resolution = resolution
         self.num_channels = num_channels
+        self.num_blocks = num_blocks
+        self.kernel_size = kernel_size
         print(self.scale)
         if(self.scale == 0):
             self.optimal_noise = torch.randn(self.get_input_shape(), device=device)
@@ -727,13 +838,16 @@ class SinGAN_Generator(nn.Module):
         else:
             return self.model.parameters()
 
+    def receptive_field(self):
+        return (self.kernel_size-1)*self.num_blocks
+
     def forward(self, data, noise=None):
         if(noise is None):
             noise = torch.zeros(data.shape).to(self.device)
-        noisePlusData = data.clone() + noise
+        noisePlusData = data + noise
         if(self.pre_padding):
             noisePlusData = F.pad(noisePlusData, self.required_padding)
-
+        torch.cuda.empty_cache()
         output = self.model(noisePlusData)
 
         if(self.physical_constraints == "hard"):

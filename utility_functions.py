@@ -11,7 +11,17 @@ import numbers
 from torch.nn import functional as F
 from matplotlib.pyplot import cm
 import time
+import gc
 
+def current_mem():
+    for obj in gc.get_objects():
+        try:
+            if torch.is_tensor(obj):                
+                print(obj.name, obj.size(), obj.element_size() * obj.nelement())
+            elif (hasattr(obj, 'data') and torch.is_tensor(obj.data)):
+                print(obj.size(), obj.element_size() * obj.nelement())
+        except:
+            pass
 
 def bilinear_interpolate(im, x, y):
     dtype = torch.cuda.FloatTensor
@@ -115,6 +125,27 @@ def to_mag(vectorField, normalize=True, max_mag = None):
         else:
             r[0] *= (2 / max_mag)
     return r[0:1]
+
+def to_vort(vectorField, normalize=True, device=None):
+    vf = vectorField.clone()
+    if(len(vf.shape) == 4):
+        xdy = spatial_derivative2D(vf[:,0:1,:,:], 0, device)
+        ydx = spatial_derivative2D(vf[:,1:2,:,:], 1, device)
+        return (ydx - xdy)[0,0]
+    elif(len(vf.shape) == 5):
+        
+        zdy = spatial_derivative3D(vf[:,2:3,:,:,:], 1, device)
+        ydz = spatial_derivative3D(vf[:,1:2,:,:,:], 0, device)
+
+        
+        xdz = spatial_derivative3D(vf[:,0:1,:,:,:], 0, device)
+        zdx = spatial_derivative3D(vf[:,2:3,:,:,:], 2, device)
+
+        xdy = spatial_derivative3D(vf[:,0:1,:,:,:], 1, device)
+        ydx = spatial_derivative3D(vf[:,1:2,:,:,:], 2, device)
+
+        vorts = torch.cat([zdy-ydz, xdz-zdx, ydx-xdy], axis=0)
+        return vorts
 
 def feature_distance(img1, img2):
     if(features_model is None):

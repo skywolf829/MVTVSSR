@@ -160,6 +160,8 @@ for i in range(len(dataset)):
         multichannel=True).swapaxes(0,1).swapaxes(0,2)
     f_lr = np2torch(f_lr, opt['device']).unsqueeze(0).to(opt['device'])
     g_mag = torch.norm(f_hr, dim=1).detach().cpu().numpy()
+    g_vort = to_vort(f_hr, device=opt['device'])
+    print(g_vort.shape)
     GT_frames.append(toImg(f_hr.clone()[0].detach().cpu().numpy()).swapaxes(0,2).swapaxes(0,1))
     gt_mag.append(toImg(g_mag).swapaxes(0,2).swapaxes(0,1))
 

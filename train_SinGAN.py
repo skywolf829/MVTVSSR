@@ -9,7 +9,7 @@ import imageio
 import argparse
 import time
 import datetime
-
+from pytorch_memlab import LineProfiler, MemReporter, profile
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Train on an input that is 2D')
@@ -96,8 +96,10 @@ if __name__ == '__main__':
 
         print_to_log_and_console(str(datetime.datetime.now()) + " - Beginning training on scale " + str(len(generators)),
         os.path.join(opt["save_folder"], opt["save_name"]), "log.txt")
-
-        generator, discriminator = train_single_scale(generators, discriminators, opt)
+        #with profiler.profile(profile_memory=True, use_cuda=True, record_shapes=True) as prof:
+        generator, discriminator = train_single_scale_wrapper(generators, discriminators, opt)
+        #reporter = MemReporter()
+        #reporter.report()
         discriminator.to("cpu")
         generators.append(generator)
         discriminators.append(discriminator)
@@ -105,6 +107,9 @@ if __name__ == '__main__':
         time_passed = (time.time() - start_time_scale_n) / 60
         print_to_log_and_console("%s - Finished training in scale %i in %f minutes" % (str(datetime.datetime.now()), len(generators)-1, time_passed),
         os.path.join(opt["save_folder"], opt["save_name"]), "log.txt") 
+        #print(prof.key_averages().table(sort_by="self_cpu_memory_usage", row_limit=10))
+        #print(prof.key_averages().table(sort_by="cpu_memory_usage", row_limit=10))
+        
 
 
     time_passed = (time.time() - start_time) / 60
