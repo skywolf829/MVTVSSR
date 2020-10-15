@@ -289,9 +289,10 @@ def init_discrim(scale, opt):
     weights_init(discriminator)
     return discriminator
 
-def generate(generators, mode, opt, device):
+def generate(generators, mode, opt, device, generated_image=None, start_scale=0):
     with torch.no_grad():
-        generated_image = torch.zeros(generators[0].get_input_shape()).to(device)
+        if(generated_image is None):
+            generated_image = torch.zeros(generators[0].get_input_shape()).to(device)
         
         for i in range(0, len(generators)):
             generated_image = F.interpolate(generated_image, 
@@ -303,14 +304,22 @@ def generate(generators, mode, opt, device):
                 noise = torch.randn(generators[i].get_input_shape(), 
                 device=device)
             generated_image = generators[i](generated_image, 
-            opt["noise_amplitudes"][i]*noise)
+            opt["noise_amplitudes"][i+start_scale]*noise)
+            print(generated_image.shape)
+            print(generated_image.min())
+            print(generated_image.max())
+            print(opt['noise_amplitudes'][i])
+            print(noise.max())
+            plt.imshow(generated_image.cpu().numpy()[0].swapaxes(0,2).swapaxes(0,1))
+            plt.show()
 
     return generated_image
 
-def generate_by_patch(generators, mode, opt, device, patch_size):
+def generate_by_patch(generators, mode, opt, device, patch_size, generated_image=None, start_scale=0):
     with torch.no_grad():
         #seq = []
-        generated_image = torch.zeros(generators[0].get_input_shape()).to(device)
+        if(generated_image is None):
+            generated_image = torch.zeros(generators[0].get_input_shape()).to(device)
         
         for i in range(0, len(generators)):
             #print("Gen " + str(i))
@@ -337,7 +346,7 @@ def generate_by_patch(generators, mode, opt, device, patch_size):
                         
                         #print("[%i:%i, %i:%i, %i:%i]" % (z, z_stop, y, y_stop, x, x_stop))
                         result = generators[i](LR[:,:,y:y_stop,x:x_stop], 
-                        opt["noise_amplitudes"][i]*noise)
+                        opt["noise_amplitudes"][i+start_scale]*noise)
 
                         x_offset = rf if x > 0 else 0
                         y_offset = rf if y > 0 else 0
@@ -366,7 +375,7 @@ def generate_by_patch(generators, mode, opt, device, patch_size):
                             
                             #print("[%i:%i, %i:%i, %i:%i]" % (z, z_stop, y, y_stop, x, x_stop))
                             result = generators[i](LR[:,:,z:z_stop,y:y_stop,x:x_stop], 
-                            opt["noise_amplitudes"][i]*noise)
+                            opt["noise_amplitudes"][i+start_scale]*noise)
 
                             x_offset = rf if x > 0 else 0
                             y_offset = rf if y > 0 else 0
@@ -551,9 +560,9 @@ def train_single_scale(generators, discriminators, opt):
         real = real.to(opt['device'])
 
     if(opt['mode'] == '3D'):
-        max_dim = opt["patch_size"]*opt["patch_size"]*opt["patch_size"]
+        max_dim = opt["training_patch_size"]*opt["training_patch_size"]*opt["training_patch_size"]
     elif(opt['mode'] == '2D'):
-        max_dim = opt["patch_size"]*opt["patch_size"]
+        max_dim = opt["training_patch_size"]*opt["training_patch_size"]
 
     curr_size = opt["resolutions"][len(generators)][0]
     for z in range(1, len(opt["resolutions"][len(generators)])):
@@ -562,11 +571,8 @@ def train_single_scale(generators, discriminators, opt):
     opt["noise_amplitudes"].append(1.0)
     if(len(generators) > 0):
         with torch.no_grad():
-            if(curr_size <= max_dim):
-                optimal_LR = generate(generators, "reconstruct", opt, opt["device"]).detach()
-            else:            
-                optimal_LR = generate_by_patch(generators, "reconstruct", opt, 
-                opt["device"], opt["patch_size"]).detach()
+            optimal_LR = generate_by_patch(generators, "reconstruct", opt, 
+            opt["device"], opt["patch_size"]).detach()
         optimal_LR = F.interpolate(optimal_LR, size=opt["resolutions"][len(generators)],
         mode=opt["upsample_mode"])
         with torch.no_grad():
@@ -597,8 +603,8 @@ def train_single_scale(generators, discriminators, opt):
             starts = []
             ends = []
             for z in range(0, len(opt["resolutions"][len(generators)])):
-                starts.append(random.randrange(0, opt["resolutions"][len(generators)][z] - opt["patch_size"]))
-                ends.append(starts[-1]+opt["patch_size"])
+                starts.append(random.randrange(0, opt["resolutions"][len(generators)][z] - opt["training_patch_size"]))
+                ends.append(starts[-1]+opt["training_patch_size"])
         
         if(curr_size > max_dim):
             if(opt['mode'] == "2D"):
@@ -623,7 +629,7 @@ def train_single_scale(generators, discriminators, opt):
                         fake = generator(fake_prev_view,noise)
                 else:
                     noise = opt["noise_amplitudes"][-1] * torch.randn(generator.get_input_shape()).to(opt["device"])
-                    fake = generator(fake_prev.detach(), noise)
+                    fake = generator(fake_prev.detach(),noise)
                 D_loss = 0
                 # Train with real downscaled to this scale
                 discriminator.zero_grad()
@@ -657,6 +663,7 @@ def train_single_scale(generators, discriminators, opt):
                         fake = generator(fake_prev_view, noise)
                         output = discriminator(fake)
                 else:
+                    noise = opt["noise_amplitudes"][-1] * torch.randn(generator.get_input_shape()).to(opt["device"])
                     fake = generator(fake_prev.detach(), noise)
                     output = discriminator(fake)
 
@@ -710,12 +717,11 @@ def train_single_scale(generators, discriminators, opt):
             real_gradient = torch.cat(real_gradient, 1)
             rec_gradient = torch.cat(rec_gradient, 1)
             gradient_loss = loss(real_gradient, rec_gradient)
-            
             if(opt["physical_constraints"] == "soft"):
                 phys_loss = opt["alpha_3"] * g 
                 phys_loss.backward(retain_graph = True)
             rec_loss = loss(optimal_reconstruction, r)
-            
+
             if(opt['alpha_1'] > 0.0):
                 rec_loss_adj = rec_loss * opt["alpha_1"]
                 rec_loss_adj.backward(retain_graph=True)
@@ -734,7 +740,7 @@ def train_single_scale(generators, discriminators, opt):
             noise_cm = toImg(noise_numpy)
             writer.add_image("noise/%i"%len(generators), 
             noise_cm, epoch)            
-            real_numpy = real.detach().cpu().numpy()[0]
+            real_numpy = r.detach().cpu().numpy()[0]
             real_cm = toImg(real_numpy)
             writer.add_image("real/%i"%len(generators), 
             real_cm, epoch)
@@ -890,6 +896,67 @@ class SinGAN_Generator(nn.Module):
     def receptive_field(self):
         return (self.kernel_size-1)*self.num_blocks
 
+    def generate_patchwise(self, data, noise, patch_size):
+        if(noise is None):
+            noise = torch.zeros(data.shape).to(self.device)
+
+        noisePlusData = data + noise
+        if(self.pre_padding):
+            noisePlusData = F.pad(noisePlusData, self.required_padding)
+
+        output = torch.zeros(data.shape).to(self.device)
+        rf = int(self.receptive_field() / 2)
+        if(opt['mode'] == "2D"):
+            for y in range(0,data.shape[2], patch_size-2*rf):
+                y = min(y, max(0, data.shape[2] - patch_size))
+                y_stop = min(data.shape[2], y + patch_size)
+
+                for x in range(0,data.shape[3], patch_size-2*rf):
+                    x = min(x, max(0, data.shape[3] - patch_size))
+                    x_stop = min(data.shape[3], x + patch_size)
+                    #if(i == len(generators) - 1):
+                    #    seq.append(data.detach().cpu().numpy()[0].swapaxes(0,2).swapaxes(0,1))
+                   
+                    d = data[:,:,y:y_stop,x:x_stop]
+                    n = noise[:,:,y:y_stop,x:x_stop]
+                    #print("[%i:%i, %i:%i, %i:%i]" % (z, z_stop, y, y_stop, x, x_stop))
+                    result = d + self.forward(data[:,:,y:y_stop,x:x_stop], n)
+
+                    x_offset = rf if x > 0 else 0
+                    y_offset = rf if y > 0 else 0
+
+                    output[:,:,
+                    y+y_offset:y+d.shape[2],
+                    x+x_offset:x+d.shape[3]] = result[:,:,y_offset:,x_offset:]
+
+        elif(opt['mode'] == '3D'):
+            for z in range(0,data.shape[2], patch_size-2*rf):
+                z = min(z, max(0, data.shape[2] - patch_size))
+                z_stop = min(data.shape[2], z + patch_size)
+                for y in range(0,data.shape[3], patch_size-2*rf):
+                    y = min(y, max(0, data.shape[3] - patch_size))
+                    y_stop = min(data.shape[3], y + patch_size)
+
+                    for x in range(0,data.shape[4], patch_size-2*rf):
+                        x = min(x, max(0, data.shape[4] - patch_size))
+                        x_stop = min(data.shape[4], x + patch_size)
+
+                        d = data[:,:,z:z_stop,y:y_stop,x:x_stop]
+                        n = noise[:,:,z:z_stop,y:y_stop,x:x_stop]
+                        #print("[%i:%i, %i:%i, %i:%i]" % (z, z_stop, y, y_stop, x, x_stop))
+                        result = d + self.forward(data[:,:,z:z_stop,y:y_stop,x:x_stop], n)
+
+                        x_offset = rf if x > 0 else 0
+                        y_offset = rf if y > 0 else 0
+                        z_offset = rf if z > 0 else 0
+
+                        output[:,:,
+                        z+z_offset:z+d.shape[2],
+                        y+y_offset:y+d.shape[3],
+                        x+x_offset:x+d.shape[4]] = result[:,:,z_offset,y_offset:,x_offset:]
+
+        return output
+
     def forward(self, data, noise=None):
         if(noise is None):
             noise = torch.zeros(data.shape).to(self.device)
@@ -913,6 +980,9 @@ class SinGAN_Discriminator(nn.Module):
         self.device=device
         modules = []
         self.resolution = resolution
+        self.mode = mode
+        self.kernel_size = kernel_size
+        self.num_blocks = num_blocks
 
         if(mode == "2D"):
             conv_layer = nn.Conv2d
@@ -954,6 +1024,63 @@ class SinGAN_Discriminator(nn.Module):
                     m = torch.nn.utils.spectral_norm(m)
                 elif classname.find('Norm') != -1:
                     m = torch.nn.utils.spectral_norm(m)
+
+    def receptive_field(self):
+        return (self.kernel_size-1)*self.num_blocks
+
+    def generate_patchwise(self, data):
+
+        output = torch.zeros(data.shape).to(self.device)
+        rf = int(self.receptive_field() / 2)
+
+        if(self.mode == "2D"):
+            for y in range(0,data.shape[2], patch_size-2*rf):
+                y = min(y, max(0, data.shape[2] - patch_size))
+                y_stop = min(data.shape[2], y + patch_size)
+
+                for x in range(0,data.shape[3], patch_size-2*rf):
+                    x = min(data, max(0, data.shape[3] - patch_size))
+                    x_stop = min(data.shape[3], x + patch_size)
+                    #if(i == len(generators) - 1):
+                    #    seq.append(data.detach().cpu().numpy()[0].swapaxes(0,2).swapaxes(0,1))
+                   
+                    d = data[:,:,y:y_stop,x:x_stop]
+                    n = noise[:,:,y:y_stop,x:x_stop]
+                    #print("[%i:%i, %i:%i, %i:%i]" % (z, z_stop, y, y_stop, x, x_stop))
+                    result = d + self.forward(data[:,:,y:y_stop,x:x_stop], n)
+
+                    x_offset = rf if x > 0 else 0
+                    y_offset = rf if y > 0 else 0
+
+                    output[:,:,
+                    y+y_offset:y+d.shape[2],
+                    x+x_offset:x+d.shape[3]] = result[:,:,y_offset:,x_offset:]
+
+        elif (self.mode == '3D'):
+            for z in range(0,data.shape[2], patch_size-2*rf):
+                z = min(z, max(0, data.shape[2] - patch_size))
+                z_stop = min(data.shape[2], z + patch_size)
+                for y in range(0,data.shape[3], patch_size-2*rf):
+                    y = min(y, max(0, data.shape[3] - patch_size))
+                    y_stop = min(data.shape[3], y + patch_size)
+
+                    for x in range(0,data.shape[4], patch_size-2*rf):
+                        x = min(x, max(0, data.shape[4] - patch_size))
+                        x_stop = min(data.shape[4], x + patch_size)
+
+                        d = data[:,:,z:z_stop,y:y_stop,x:x_stop]
+                        n = noise[:,:,z:z_stop,y:y_stop,x:x_stop]
+                        #print("[%i:%i, %i:%i, %i:%i]" % (z, z_stop, y, y_stop, x, x_stop))
+                        result = d + self.forward(data[:,:,z:z_stop,y:y_stop,x:x_stop], n)
+
+                        x_offset = rf if x > 0 else 0
+                        y_offset = rf if y > 0 else 0
+                        z_offset = rf if z > 0 else 0
+
+                        output[:,:,
+                        z+z_offset:z+d.shape[2],
+                        y+y_offset:y+d.shape[3],
+                        x+x_offset:x+d.shape[4]] = result[:,:,z_offset,y_offset:,x_offset:]
 
     def forward(self, x):
         return self.model(x)
