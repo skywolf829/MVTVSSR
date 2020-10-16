@@ -649,11 +649,9 @@ def train_single_scale(generators, discriminators, opt):
                 if(opt['mode'] == "2D"):
                     fake_prev_view = fake_prev[:,:,starts[0]:ends[0],starts[1]:ends[1]]
                     noise = opt["noise_amplitudes"][-1] * torch.randn(fake_prev_view.shape).to(opt["device"])
-                    fake = generator(fake_prev_view.detach(),noise.detach())
                 elif(opt['mode'] == "3D"):
                     fake_prev_view = fake_prev[:,:,starts[0]:ends[0],starts[1]:ends[1],starts[2]:ends[2]]
                     noise = opt["noise_amplitudes"][-1] * torch.randn(fake_prev_view.shape).to(opt["device"])
-                    fake = generator(fake_prev_view.detach(),noise.detach())
                 fake = generator(fake_prev_view, noise.detach())
                 output = discriminator(fake.detach())
                 discrim_error_fake = output.mean()
@@ -672,7 +670,9 @@ def train_single_scale(generators, discriminators, opt):
             generator.zero_grad()
             G_loss = 0
             gen_err_total = 0
-            if opt["alpha_2"] > 0.0:
+            loss = nn.L1Loss().to(opt["device"])
+
+            if(opt["alpha_2"] > 0.0):
                 fake = generator(fake_prev_view, noise.detach())
                 output = discriminator(fake)
                 generator_error = -output.mean()# * opt["alpha_2"]
@@ -680,10 +680,6 @@ def train_single_scale(generators, discriminators, opt):
                 #generator_error.backward(retain_graph=True)
                 G_loss = output.mean().item()
                 discrim_output_map_fake_img = toImg(output.detach().cpu().numpy()[0])
-
-            loss = nn.L1Loss().to(opt["device"])
-            
-            # Re-compute the constructed image
             if(opt['alpha_1'] > 0.0 or opt['alpha_4'] > 0.0):
                 if(opt['mode'] == "2D"):
                     opt_noise = opt["noise_amplitudes"][-1]*generator.optimal_noise[:,:,starts[0]:ends[0],starts[1]:ends[1]]
@@ -693,7 +689,6 @@ def train_single_scale(generators, discriminators, opt):
                     opt_noise = opt["noise_amplitudes"][-1]*generator.optimal_noise[:,:,starts[0]:ends[0],starts[1]:ends[1],starts[2]:ends[2]]
                     optimal_reconstruction = generator(optimal_LR.detach()[:,:,starts[0]:ends[0],starts[1]:ends[1],starts[2]:ends[2]], 
                     opt_noise)
-            
             if(opt['alpha_1'] > 0.0):
                 rec_loss = loss(optimal_reconstruction, r) * opt["alpha_1"]
                 gen_err_total += rec_loss
