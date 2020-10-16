@@ -7,6 +7,7 @@ class Options():
         # Input info
         opt["mode"]                    = "2D"      # What SinGAN to use - 2D or 3D
         opt["data_folder"]             = "JHUturbulence/isotropic512coarse"
+        #opt["data_folder"]             = "TestImage"
         opt["image_normalize"]         = False
         opt["scale_data"]              = False
         opt['scale_on_magnitude']      = True
@@ -29,7 +30,7 @@ class Options():
         opt["n"]                       = 0         # Number of scales in the heirarchy, defined by the input and min_dimension_size
         opt["resolutions"]             = []        # The scales for the GAN
         opt["noise_amplitudes"]        = []
-        opt["use_spectral_norm"]       = True
+        opt["use_spectral_norm"]       = False
         opt["downsample_mode"]         = "nearest"
         opt["upsample_mode"]           = "bicubic"
 
@@ -41,18 +42,18 @@ class Options():
         opt["save_generators"]         = True
         opt["save_discriminators"]     = True
         opt["physical_constraints"]    = "none"
-        opt["patch_size"]              = 64
-        opt["training_patch_size"]     = 512
+        opt["patch_size"]              = 256
+        opt["training_patch_size"]     = 32
 
         # GAN training info
         opt["alpha_1"]                 = 0       # Reconstruction loss coefficient
         opt["alpha_2"]                 = 1        # Adversarial loss coefficient
         opt["alpha_3"]                 = 0        # Soft physical loss coefficient
-        opt["alpha_4"]                 = 10       # mag_and_angle loss
+        opt["alpha_4"]                 = 100       # mag_and_angle loss
         opt["alpha_5"]                 = 1          # first derivative loss coeff
         opt["generator_steps"]         = 3
         opt["discriminator_steps"]     = 3
-        opt["epochs"]                  = 2000
+        opt["epochs"]                  = 1001
         opt["minibatch"]               = 1        # Minibatch for training
         opt["num_workers"]             = 0
         opt["learning_rate"]           = 0.0005    # Learning rate for GAN

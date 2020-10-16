@@ -21,7 +21,7 @@ save_folder = os.path.join(MVTVSSR_folder_path, "SavedModels")
 
 parser = argparse.ArgumentParser(description='Test a trained model')
 
-parser.add_argument('--load_from',default="Temp")
+parser.add_argument('--load_from',default="trainpatch64recpatch64test")
 parser.add_argument('--data_folder',default="JHUturbulence/isotropic512coarse",type=str,help='File to test on')
 parser.add_argument('--device',default="cuda:0",type=str,help='Frames to use from training file')
 
@@ -47,13 +47,8 @@ dataset = Dataset(os.path.join(input_folder, args["data_folder"]), opt)
 f = dataset.__getitem__(0).to(opt['device'])
 print(f.min())
 print(f.max())
-#singan_generated_patch = generate_by_patch(generators, 'reconstruct', opt, opt['device'], opt['patch_size'])
-
-singan_generated = generate(generators, 'reconstruct', opt, opt['device'])
+singan_generated = generate_by_patch(generators, 'reconstruct', opt, opt['device'], opt['patch_size'])
 rec_numpy = singan_generated.detach().cpu().numpy()[0]
 rec_cm = toImg(rec_numpy)
 print(rec_cm.shape)
-imageio.imwrite("full.png", rec_cm.swapaxes(0,2).swapaxes(0,1))
-#imageio.imwrite("full_gt.png", f.detach().cpu().numpy()[0].swapaxes(0,2).swapaxes(0,1))
-print(singan_generated.min())
-print(singan_generated.max())
+imageio.imwrite("64patch_rec.png", rec_cm.swapaxes(0,2).swapaxes(0,1))
