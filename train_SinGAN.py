@@ -54,6 +54,7 @@ if __name__ == '__main__':
     parser.add_argument('--gamma',default=None, type=float,help='')
     parser.add_argument('--physical_constraints',default=None,type=str,help='none, soft, or hard')
     parser.add_argument('--patch_size',default=None, type=int,help='Patch size for inference')
+    parser.add_argument('--training_patch_size',default=None, type=int,help='Patch size for training')
     parser.add_argument('--upsample_mode',default=None, type=str,help='Method for upsampling')
 
     parser.add_argument('--load_from',default=None, type=str,help='Load a model to continue training')
