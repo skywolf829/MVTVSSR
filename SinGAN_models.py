@@ -60,6 +60,16 @@ def TAD3D(field, device):
     g = torch.abs(tx + ty + tz)
     return g
 
+def curl3D(field, device):
+    dzdy = spatial_derivative3D_CD(field[:,2:3], 1, device)
+    dydz = spatial_derivative3D_CD(field[:,1:2], 0, device)
+    dxdz = spatial_derivative3D_CD(field[:,0:1], 0, device)
+    dzdx = spatial_derivative3D_CD(field[:,2:3], 2, device)
+    dydx = spatial_derivative3D_CD(field[:,1:2], 2, device)
+    dxdy = spatial_derivative3D_CD(field[:,0:1], 1, device)
+    output = torch.cat((dzdy-dydz,dxdz-dzdx,dydx-dxdy), 1)
+    return output
+
 def TAD3D_CD(field, device):
     tx = spatial_derivative3D_CD(field[:,0:1,:,:,:], 2, device)
     ty = spatial_derivative3D_CD(field[:,1:2,:,:,:], 1, device)
@@ -123,26 +133,50 @@ def spatial_derivative3D(field, axis, device):
 
 def spatial_derivative3D_CD(field, axis, device):
     m = nn.ReplicationPad3d(1)
+    # the first (a) axis in [a, b, c]
     if(axis == 0):
-        weights = torch.tensor(np.array([
-            [[0, 0, 0], [0, 0, 0], [0, 0, 0]],
-            [[0, -1/2, 0], [0, 0, 0], [0, 1/2, 0]],
-            [[0, 0, 0], [0, 0, 0], [0, 0, 0]]]
-            )
+        weights = torch.tensor(np.array(
+            [[[0, 0, 0], 
+            [0, -0.5, 0],
+            [0, 0, 0]],
+
+            [[0, 0, 0], 
+            [0, 0, 0], 
+            [0, 0, 0]],
+
+            [[0, 0, 0], 
+            [0, 0.5, 0], 
+            [0, 0, 0]]])
             .astype(np.float32)).to(device)
-    elif(axis == 1):
+    elif(axis == 1):        
+        # the second (b) axis in [a, b, c]
         weights = torch.tensor(np.array([
-            [[0, 0, 0], [0, -1/2, 0], [0, 0, 0]],
-            [[0, 0, 0], [0, 0, 0], [0, 0, 0]],
-            [[0, 0, 0], [0, 1/2, 0], [0, 0, 0]]]
-            )
+            [[0, 0, 0], 
+            [0, 0, 0], 
+            [0, 0, 0]],
+
+            [[0, -0.5, 0], 
+            [0, 0, 0], 
+            [0, 0.5, 0]],
+
+            [[0, 0, 0], 
+            [0, 0, 0], 
+            [0, 0, 0]]])
             .astype(np.float32)).to(device)
     elif(axis == 2):
+        # the third (c) axis in [a, b, c]
         weights = torch.tensor(np.array([
-            [[0, 0, 0], [0, 0, 0], [0, 0, 0]],
-            [[0, 0, 0], [-1/2, 0, 1/2], [0, 0, 0]],
-            [[0, 0, 0], [0, 0,  0], [ 0, 0, 0]]]
-            )
+            [[0, 0, 0], 
+            [0, 0, 0], 
+            [0, 0, 0]],
+
+            [[0, 0, 0], 
+            [-0.5, 0, 0.5], 
+            [0, 0, 0]],
+
+            [[0, 0, 0], 
+            [0, 0,  0], 
+            [ 0, 0, 0]]])
             .astype(np.float32)).to(device)
     weights = weights.view(1, 1, 3, 3, 3)
     field = m(field)
@@ -806,6 +840,7 @@ class SinGAN_Generator(nn.Module):
         self.num_channels = num_channels
         self.num_blocks = num_blocks
         self.kernel_size = kernel_size
+        self.mode = mode
         print(self.scale)
         if(self.scale == 0):
             self.optimal_noise = torch.randn(self.get_input_shape(), device=device)
@@ -909,10 +944,8 @@ class SinGAN_Generator(nn.Module):
             noisePlusData = F.pad(noisePlusData, self.required_padding)
         output = self.model(noisePlusData)
 
-        if(self.physical_constraints == "hard"):
-            x = -spatial_derivative2D(output, "y", self.device)
-            y = spatial_derivative2D(output, "x", self.device)
-            output = torch.cat((x, y), 1)
+        if(self.physical_constraints == "hard" and self.mode == '3D'):
+            output = curl3D(output, self.device)
             return output
         else:
             return output + data

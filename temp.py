@@ -30,6 +30,7 @@ args = vars(parser.parse_args())
 opt = load_options(os.path.join(save_folder, args["load_from"]))
 opt["device"] = args["device"]
 opt["save_name"] = args["load_from"]
+'''
 generators, discriminators = load_models(opt,args["device"])
 
 for i in range(len(generators)):
@@ -43,7 +44,6 @@ for i in range(len(discriminators)):
 dataset = Dataset(os.path.join(input_folder, args["data_folder"]), opt)
 
 
-
 f = dataset.__getitem__(0).to(opt['device'])
 print(f.min())
 print(f.max())
@@ -52,3 +52,16 @@ rec_numpy = singan_generated.detach().cpu().numpy()[0]
 rec_cm = toImg(rec_numpy)
 print(rec_cm.shape)
 imageio.imwrite("64patch_rec.png", rec_cm.swapaxes(0,2).swapaxes(0,1))
+'''
+
+a = torch.randn([1, 3, 64, 64, 64]).to(opt['device'])
+
+g = TAD3D_CD(a, opt['device'])
+print(a.shape)
+print(g.mean())
+
+a = curl3D(a, opt['device'])
+g = TAD3D_CD(a, opt['device'])
+
+print(a.shape)
+print(g.mean())

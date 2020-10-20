@@ -105,6 +105,7 @@ if __name__ == '__main__':
         discriminator.to("cpu")
         generators.append(generator)
         discriminators.append(discriminator)
+        save_models(generators, discriminators, opt)
             
         time_passed = (time.time() - start_time_scale_n) / 60
         print_to_log_and_console("%s - Finished training in scale %i in %f minutes" % (str(datetime.datetime.now()), len(generators)-1, time_passed),

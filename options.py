@@ -43,7 +43,7 @@ class Options():
         opt["save_discriminators"]     = True
         opt["physical_constraints"]    = "none"
         opt["patch_size"]              = 256
-        opt["training_patch_size"]     = 32
+        opt["training_patch_size"]     = 64
 
         # GAN training info
         opt["alpha_1"]                 = 0       # Reconstruction loss coefficient

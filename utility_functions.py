@@ -48,6 +48,39 @@ def bilinear_interpolate(im, x, y):
     wd = (x-x0.type(dtype)) * (y-y0.type(dtype))
     return Ia*wa + Ib*wb + Ic*wc + Id*wd
 
+def trilinear_interpolate(im, z, y, x):
+    dtype = torch.cuda.FloatTensor
+    dtype_long = torch.cuda.LongTensor
+    
+    x0 = torch.floor(x).type(dtype_long)
+    x1 = x0 + 1
+    
+    y0 = torch.floor(y).type(dtype_long)
+    y1 = y0 + 1
+
+    z0 = torch.floor(z).type(dtype_long)
+    z1 = z0 + 1
+
+    x0 = torch.clamp(x0, 0, im.shape[4]-1).type(dtype)
+    x1 = torch.clamp(x1, 0, im.shape[4]-1).type(dtype)
+
+    y0 = torch.clamp(y0, 0, im.shape[3]-1).type(dtype)
+    y1 = torch.clamp(y1, 0, im.shape[3]-1).type(dtype)
+
+    z0 = torch.clamp(z0, 0, im.shape[2]-1).type(dtype)
+    z1 = torch.clamp(z1, 0, im.shape[2]-1).type(dtype)
+    
+    c00 = im[0,:,z0,y0,x0] * (z1-z) + im[0,:,z1,y0,x0]*(z-z0)
+    c01 = im[0,:,z0,y0,x1] * (z1-z) + im[0,:,z1,y0,x1]*(z-z0)
+    c10 = im[0,:,z0,y1,x0] * (z1-z) + im[0,:,z1,y1,x0]*(z-z0)
+    c11 = im[0,:,z0,y1,x1] * (z1-z) + im[0,:,z1,y1,x1]*(z-z0)
+
+    c0 = c00 * (y1-y) + c10 * (y-y0)
+    c1 = c01 * (y1-y) + c11 * (y-y0)
+
+    c = c0 * (x1-x) + c1 * (x-x0)
+    return c
+    
 def lagrangian_transport(VF, x_res, y_res, time_length, ts_per_sec, device):
     #x = torch.arange(-1, 1, int(VF.shape[2] / x_res), dtype=torch.float32).unsqueeze(1).expand([int(VF.shape[2] / x_res), int(VF.shape[3] / y_res)]).unsqueeze(0)
 
@@ -68,6 +101,32 @@ def lagrangian_transport(VF, x_res, y_res, time_length, ts_per_sec, device):
         start_t = time.time()
         flow = bilinear_interpolate(VF, particles[:,0], particles[:,1])
         particles[:] += flow[0:2, :].permute(1,0) * (1 / ts_per_sec)
+        particles[:] += torch.tensor(list(VF.shape[2:])).to(device)
+        particles[:] %= torch.tensor(list(VF.shape[2:])).to(device)
+    particles_over_time.append(particles)
+    
+    return particles_over_time
+
+def lagrangian_transport3D(VF, x_res, y_res, z_res, time_length, ts_per_sec, device):
+    #x = torch.arange(-1, 1, int(VF.shape[2] / x_res), dtype=torch.float32).unsqueeze(1).expand([int(VF.shape[2] / x_res), int(VF.shape[3] / y_res)]).unsqueeze(0)
+
+    x = torch.arange(0, VF.shape[4], int(VF.shape[4] / x_res), dtype=torch.float32).view(1, 1, -1).repeat([z_res, y_res, 1])
+    x = x.view(1,z_res, y_res, x_res)
+    y = torch.arange(0, VF.shape[3], int(VF.shape[3] / y_res), dtype=torch.float32).view(1, -1, 1).repeat([z_res, 1, x_res])
+    y = y.view(1,z_res,y_res, x_res)
+    z = torch.arange(0, VF.shape[2], int(VF.shape[2] / z_res), dtype=torch.float32).view(-1, 1, 1).repeat([1, y_res, x_res])
+    z = y.view(1,z_res,y_res, x_res)
+
+    particles = torch.cat([z, y, x],axis=0)
+    particles = torch.reshape(particles, [3, -1]).transpose(0,1)
+    particles = particles.to(device)
+    particles_over_time = []
+        
+    for i in range(0, time_length * ts_per_sec):
+        particles_over_time.append(particles.clone())
+        start_t = time.time()
+        flow = bilinear_interpolate(VF, particles[:,0], particles[:,1])
+        particles[:] += flow[0:3, :].permute(1,0) * (1 / ts_per_sec)
         particles[:] += torch.tensor(list(VF.shape[2:])).to(device)
         particles[:] %= torch.tensor(list(VF.shape[2:])).to(device)
     particles_over_time.append(particles)
