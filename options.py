@@ -5,8 +5,8 @@ class Options():
     def get_default():
         opt = {}
         # Input info
-        opt["mode"]                    = "2D"      # What SinGAN to use - 2D or 3D
-        opt["data_folder"]             = "JHUturbulence/isotropic512coarse"
+        opt["mode"]                    = "3D"      # What SinGAN to use - 2D or 3D
+        opt["data_folder"]             = "JHUturbulence/isotropic512_3D"
         #opt["data_folder"]             = "TestImage"
         opt["image_normalize"]         = False
         opt["scale_data"]              = False
@@ -32,7 +32,7 @@ class Options():
         opt["noise_amplitudes"]        = []
         opt["use_spectral_norm"]       = False
         opt["downsample_mode"]         = "nearest"
-        opt["upsample_mode"]           = "bicubic"
+        opt["upsample_mode"]           = "trilinear"
 
         opt["train_distributed"]       = False
         opt["device"]                  = "cuda:0"
@@ -53,7 +53,7 @@ class Options():
         opt["alpha_5"]                 = 1          # first derivative loss coeff
         opt["generator_steps"]         = 3
         opt["discriminator_steps"]     = 3
-        opt["epochs"]                  = 1001
+        opt["epochs"]                  = 2001
         opt["minibatch"]               = 1        # Minibatch for training
         opt["num_workers"]             = 0
         opt["learning_rate"]           = 0.0005    # Learning rate for GAN
