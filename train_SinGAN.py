@@ -81,9 +81,16 @@ if __name__ == '__main__':
     # Determine scales
     init_scales(opt, dataset)
 
-    # Init models
-    generators = []
-    discriminators = []
+    if(args['load_from'] is None):
+        # Init models
+        generators = []
+        discriminators = []
+    else:        
+        opt = load_options(os.path.join(save_folder, args["load_from"]))
+        opt["device"] = args["device"]
+        opt["save_name"] = args["load_from"]
+        generators, discriminators = load_models(opt,args["device"])
+
     
     now = datetime.datetime.now()
     start_time = time.time()
@@ -92,7 +99,8 @@ if __name__ == '__main__':
     opt["num_training_examples"] = len(os.listdir(os.path.join(input_folder,opt["data_folder"])))
 
     # Train each scale 1 by 1
-    for i in range(opt["n"]):
+    i = opt['scale_in_training']
+    while i <= range(opt["n"]):
 
         start_time_scale_n = time.time()
 
@@ -105,13 +113,14 @@ if __name__ == '__main__':
         discriminator.to("cpu")
         generators.append(generator)
         discriminators.append(discriminator)
+        i += 1
+        opt['scale_in_training'] += 1
+        opt['iteration_number'] = 0
         save_models(generators, discriminators, opt)
             
         time_passed = (time.time() - start_time_scale_n) / 60
         print_to_log_and_console("%s - Finished training in scale %i in %f minutes" % (str(datetime.datetime.now()), len(generators)-1, time_passed),
         os.path.join(opt["save_folder"], opt["save_name"]), "log.txt") 
-        #print(prof.key_averages().table(sort_by="self_cpu_memory_usage", row_limit=10))
-        #print(prof.key_averages().table(sort_by="cpu_memory_usage", row_limit=10))
         
 
 
@@ -119,8 +128,6 @@ if __name__ == '__main__':
     print_to_log_and_console("%s - Finished training  in %f minutes" % (str(datetime.datetime.now()), time_passed),
     os.path.join(opt["save_folder"], opt["save_name"]), "log.txt") 
     save_models(generators, discriminators, opt)
-
-    #os.system("test.py --load_from %s --device %s" % (args["save_name"], "cuda:"+str(opt['device'][0])))
 
 
 

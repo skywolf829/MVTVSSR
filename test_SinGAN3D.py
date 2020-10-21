@@ -53,9 +53,11 @@ opt['device'])
 
 print(f_hr.shape)
 print(f_lr.shape)
+print(len(generators))
 
 singan_output = generate_by_patch(generators, 
 "reconstruct", opt, 
-opt['device'], opt['patch_size'], generated_image=f_lr)
+opt['device'], opt['patch_size'], 
+generated_image=f_lr, start_scale=gen_to_use+1)
 
 print(singan_output.shape)

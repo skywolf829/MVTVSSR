@@ -363,13 +363,14 @@ def generate(generators, mode, opt, device, generated_image=None, start_scale=0)
 
     return generated_image
 
-def generate_by_patch(generators, mode, opt, device, patch_size, generated_image=None, start_scale=0):
+def generate_by_patch(generators, mode, opt, device, patch_size, 
+generated_image=None, start_scale=0):
     with torch.no_grad():
         #seq = []
         if(generated_image is None):
             generated_image = torch.zeros(generators[0].get_input_shape()).to(device)
         
-        for i in range(0, len(generators)):
+        for i in range(start_scale, len(generators)):
             #print("Gen " + str(i))
             rf = int(generators[i].receptive_field() / 2)
             
@@ -394,7 +395,7 @@ def generate_by_patch(generators, mode, opt, device, patch_size, generated_image
                         
                         #print("[%i:%i, %i:%i, %i:%i]" % (z, z_stop, y, y_stop, x, x_stop))
                         result = generators[i](LR[:,:,y:y_stop,x:x_stop], 
-                        opt["noise_amplitudes"][i+start_scale]*noise)
+                        opt["noise_amplitudes"][i]*noise)
 
                         x_offset = rf if x > 0 else 0
                         y_offset = rf if y > 0 else 0
@@ -424,7 +425,7 @@ def generate_by_patch(generators, mode, opt, device, patch_size, generated_image
                             
                             #print("[%i:%i, %i:%i, %i:%i]" % (z, z_stop, y, y_stop, x, x_stop))
                             result = generators[i](LR[:,:,z:z_stop,y:y_stop,x:x_stop], 
-                            opt["noise_amplitudes"][i+start_scale]*noise)
+                            opt["noise_amplitudes"][i]*noise)
 
                             x_offset = rf if x > 0 else 0
                             y_offset = rf if y > 0 else 0
@@ -630,6 +631,7 @@ def train_single_scale(generators, discriminators, opt):
         optimal_LR = torch.zeros(generator.get_input_shape(), device=opt["device"])
     #writer.add_graph(generator, [optimal_LR, generator.optimal_noise])
 
+    epoch = opt['iteration_number']
     for epoch in range(opt["epochs"]):
 
         D_loss = 0
