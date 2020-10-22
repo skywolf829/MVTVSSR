@@ -100,7 +100,7 @@ if __name__ == '__main__':
 
     # Train each scale 1 by 1
     i = opt['scale_in_training']
-    while i <= range(opt["n"]):
+    while i < opt["n"]:
 
         start_time_scale_n = time.time()
 
@@ -116,6 +116,7 @@ if __name__ == '__main__':
         i += 1
         opt['scale_in_training'] += 1
         opt['iteration_number'] = 0
+        
         save_models(generators, discriminators, opt)
             
         time_passed = (time.time() - start_time_scale_n) / 60
