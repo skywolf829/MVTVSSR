@@ -42,7 +42,7 @@ class Options():
         opt["save_generators"]         = True
         opt["save_discriminators"]     = True
         opt["physical_constraints"]    = "none"
-        opt["patch_size"]              = 256
+        opt["patch_size"]              = 128
         opt["training_patch_size"]     = 64
 
         # GAN training info
