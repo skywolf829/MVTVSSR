@@ -259,12 +259,14 @@ def laplace_pyramid_downscale3D(frame, level, downscale_per_level, device):
     kernel_size = 5
     sigma = 2 * (1 / downscale_per_level) / 6
 
-    x_cord = torch.arange(kernel_size)
-    x_grid = x_cord.repeat(kernel_size).repeat(kernel_size).view(kernel_size, kernel_size, kernel_size)
-    y_grid = torch.transpose(x_grid, 0, 1)
-    z_grid = torch.transpose(x_grid, 0, 2)
-    
-    xyz_grid = torch.stack([x_grid, y_grid, z_grid], dim=-1)
+    xyz_grid = torch.zeros([kernel_size, kernel_size, kernel_size, 3])
+    for i in range(kernel_size):
+        for j in range(kernel_size):
+            for k in range(kernel_size):
+                xyz_grid[i, j, k, 0] = i
+                xyz_grid[i, j, k, 1] = j
+                xyz_grid[i, j, k, 2] = k
+   
     print(xyz_grid.shape)
     print(xyz_grid)
     mean = (kernel_size - 1)/2.
