@@ -265,6 +265,7 @@ def laplace_pyramid_downscale3D(frame, level, downscale_per_level, device):
     z_grid = torch.transpose(x_grid, 0, 2)
     
     xyz_grid = torch.stack([x_grid, y_grid, z_grid], dim=-1)
+    print(xyz_grid.shape)
     mean = (kernel_size - 1)/2.
     variance = sigma**2.
     gaussian_kernel = (1./(2.*math.pi*variance)) *\
