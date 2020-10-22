@@ -66,8 +66,10 @@ print("SinGAN error:")
 e = ((f_hr - singan_output)**2).mean()
 print(e)
 
-singan_output = singan_output.detach().cpu().numpy()[0]
-
+singan_output = singan_output.detach().cpu().numpy()[0].swapaxes(0,3).swapaxes(0,1).swapaxes(1,2)
+m = np.linalg.norm(singan_output,axis=3)
+print(singan_output.shape)
+print(m.shape)
 from netCDF4 import Dataset
 rootgrp = Dataset("singan.nc", "w", format="NETCDF4")
 velocity = rootgrp.createGroup("velocity")
@@ -80,7 +82,7 @@ vs = rootgrp.createVariable("v", singan_output.dtype, ("u","v","w"))
 ws = rootgrp.createVariable("w", singan_output.dtype, ("u","v","w"))
 mags = rootgrp.createVariable("magnitude", singan_output.dtype, ("u","v","w"))
 velocities = rootgrp.createVariable("velocities", singan_output.dtype, ("u","v","w", "channels"))
-mags[:] = np.linalg.norm(singan_output,axis=0)
+mags[:] = m
 
 print("Trilinear upscaling:")
 print(f_lr.shape)
@@ -90,8 +92,10 @@ print(trilin.shape)
 e = ((f_hr - trilin)**2).mean()
 print(e)
 
-trilin = trilin.detach().cpu().numpy()[0]
-
+trilin = trilin.detach().cpu().numpy()[0].swapaxes(0,3).swapaxes(0,1).swapaxes(1,2)
+m = np.linalg.norm(trilin,axis=3)
+print(trilin.shape)
+print(m.shape)
 rootgrp = Dataset("trilinear.nc", "w", format="NETCDF4")
 velocity = rootgrp.createGroup("velocity")
 u = rootgrp.createDimension("u")
@@ -103,6 +107,6 @@ vs = rootgrp.createVariable("v", trilin.dtype, ("u","v","w"))
 ws = rootgrp.createVariable("w", trilin.dtype, ("u","v","w"))
 mags = rootgrp.createVariable("magnitude", trilin.dtype, ("u","v","w"))
 velocities = rootgrp.createVariable("velocities", trilin.dtype, ("u","v","w", "channels"))
-mags[:] = np.linalg.norm(trilin,axis=0)
+mags[:] = m
 
 
