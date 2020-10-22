@@ -55,9 +55,50 @@ print(f_hr.shape)
 print(f_lr.shape)
 print(len(generators))
 
+print("SinGAN upscaling:")
 singan_output = generate_by_patch(generators, 
 "reconstruct", opt, 
 opt['device'], opt['patch_size'], 
 generated_image=f_lr, start_scale=gen_to_use+1)
 
 print(singan_output.shape)
+print("SinGAN error:")
+e = ((f_hr - singan_output)**2).mean()
+print(e)
+
+from netCDF4 import Dataset
+rootgrp = Dataset("singan.nc", "w", format="NETCDF4")
+velocity = rootgrp.createGroup("velocity")
+u = rootgrp.createDimension("u")
+v = rootgrp.createDimension("v")
+w = rootgrp.createDimension("w")
+w = rootgrp.createDimension("channels", 3)
+us = rootgrp.createVariable("u", singan_output.dtype, ("u","v","w"))
+vs = rootgrp.createVariable("v", singan_output.dtype, ("u","v","w"))
+ws = rootgrp.createVariable("w", singan_output.dtype, ("u","v","w"))
+mags = rootgrp.createVariable("magnitude", singan_output.dtype, ("u","v","w"))
+velocities = rootgrp.createVariable("velocities", singan_output.dtype, ("u","v","w", "channels"))
+mags[:] = np.linalg.norm(singan_output,axis=3)
+
+print("Trilinear upscaling:")
+print(f_lr.shape)
+trilin = F.interpolate(f_lr, 
+size=generators[-1].resolution, mode=opt["upsample_mode"])
+print(trilin.shape)
+e = ((f_hr - trilin)**2).mean()
+print(e)
+
+rootgrp = Dataset("trilinear.nc", "w", format="NETCDF4")
+velocity = rootgrp.createGroup("velocity")
+u = rootgrp.createDimension("u")
+v = rootgrp.createDimension("v")
+w = rootgrp.createDimension("w")
+w = rootgrp.createDimension("channels", 3)
+us = rootgrp.createVariable("u", trilin.dtype, ("u","v","w"))
+vs = rootgrp.createVariable("v", trilin.dtype, ("u","v","w"))
+ws = rootgrp.createVariable("w", trilin.dtype, ("u","v","w"))
+mags = rootgrp.createVariable("magnitude", trilin.dtype, ("u","v","w"))
+velocities = rootgrp.createVariable("velocities", trilin.dtype, ("u","v","w", "channels"))
+mags[:] = np.linalg.norm(trilin,axis=3)
+
+
