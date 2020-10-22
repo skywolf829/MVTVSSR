@@ -66,6 +66,8 @@ print("SinGAN error:")
 e = ((f_hr - singan_output)**2).mean()
 print(e)
 
+singan_output = singan_output.detach().cpu().numpy()
+
 from netCDF4 import Dataset
 rootgrp = Dataset("singan.nc", "w", format="NETCDF4")
 velocity = rootgrp.createGroup("velocity")
@@ -87,6 +89,8 @@ size=generators[-1].resolution, mode=opt["upsample_mode"])
 print(trilin.shape)
 e = ((f_hr - trilin)**2).mean()
 print(e)
+
+trilin = trilin.detach().cpu().numpy()
 
 rootgrp = Dataset("trilinear.nc", "w", format="NETCDF4")
 velocity = rootgrp.createGroup("velocity")
