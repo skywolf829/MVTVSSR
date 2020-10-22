@@ -267,8 +267,6 @@ def laplace_pyramid_downscale3D(frame, level, downscale_per_level, device):
                 xyz_grid[i, j, k, 1] = j
                 xyz_grid[i, j, k, 2] = k
    
-    print(xyz_grid.shape)
-    print(xyz_grid)
     mean = (kernel_size - 1)/2.
     variance = sigma**2.
     gaussian_kernel = (1./(2.*math.pi*variance)) *\
