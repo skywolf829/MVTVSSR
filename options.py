@@ -44,7 +44,7 @@ class Options():
         opt["physical_constraints"]    = "none"
         opt["patch_size"]              = 128
         opt["training_patch_size"]     = 64
-
+        opt["regularization"]          = "TV" #Either TV (total variation) or GP (gradient penalty)
         # GAN training info
         opt["alpha_1"]                 = 0       # Reconstruction loss coefficient
         opt["alpha_2"]                 = 1        # Adversarial loss coefficient

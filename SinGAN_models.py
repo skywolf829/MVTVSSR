@@ -696,12 +696,19 @@ def train_single_scale(generators, discriminators, opt):
                 discrim_error_fake.backward(retain_graph=True)
                 D_loss -= output.mean().item()
 
-                # Gradient penalty here????
-                gradient_penalty = calc_gradient_penalty(discriminator, r, fake, 1, opt['device'])
-                gradient_penalty.backward()
+                if(opt['regularization'] == "GP"):
+                    # Gradient penalty 
+                    gradient_penalty = calc_gradient_penalty(discriminator, r, fake, 1, opt['device'])
+                    gradient_penalty.backward()
+                elif(opt['regularization'] == "TV"):
+                    # Total variance penalty
+                    TV_penalty_real = torch.abs(-discrim_error_real-1)
+                    TV_penalty_real.backward(retain_graph=True)
+                    TV_penalty_fake = torch.abs(discrim_error_fake+1)
+                    TV_penalty_fake.backward(retain_graph=True)
 
                 discriminator_optimizer.step()
-                
+                           
         torch.autograd.set_detect_anomaly(True)
         # Update generator: maximize D(G(z))
         for j in range(opt["generator_steps"]):

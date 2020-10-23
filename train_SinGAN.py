@@ -52,6 +52,7 @@ if __name__ == '__main__':
     parser.add_argument('--beta_1',default=None, type=float,help='')
     parser.add_argument('--beta_2',default=None, type=float,help='')
     parser.add_argument('--gamma',default=None, type=float,help='')
+    parser.add_argument('--regularization',default=None, type=str,help='')
     parser.add_argument('--physical_constraints',default=None,type=str,help='none, soft, or hard')
     parser.add_argument('--patch_size',default=None, type=int,help='Patch size for inference')
     parser.add_argument('--training_patch_size',default=None, type=int,help='Patch size for training')
@@ -116,7 +117,7 @@ if __name__ == '__main__':
         i += 1
         opt['scale_in_training'] += 1
         opt['iteration_number'] = 0
-        
+
         save_models(generators, discriminators, opt)
             
         time_passed = (time.time() - start_time_scale_n) / 60
