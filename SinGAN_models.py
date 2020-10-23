@@ -669,11 +669,10 @@ def train_single_scale(generators, discriminators, opt):
                 D_loss = 0
 
                 # Train with real downscaled to this scale
-                output = discriminator(r)
-                discrim_error_real = -output.mean()
+                output_real = discriminator(r)
+                discrim_error_real = -output_real.mean()
                 discrim_error_real.backward(retain_graph=True)
-                D_loss += output.mean().item()
-                discrim_output_map_real_img = toImg(output.detach().cpu().numpy()[0])
+                D_loss += output_real.mean().item()
 
                 # Train with the generated image
                 if(len(generators) > 0):
@@ -691,10 +690,10 @@ def train_single_scale(generators, discriminators, opt):
                     fake_prev_view = fake_prev[:,:,starts[0]:ends[0],starts[1]:ends[1],starts[2]:ends[2]]
                     noise = opt["noise_amplitudes"][-1] * torch.randn(fake_prev_view.shape).to(opt["device"])
                 fake = generator(fake_prev_view, noise.detach())
-                output = discriminator(fake.detach())
-                discrim_error_fake = output.mean()
+                output_fake = discriminator(fake.detach())
+                discrim_error_fake = output_fake.mean()
                 discrim_error_fake.backward(retain_graph=True)
-                D_loss -= output.mean().item()
+                D_loss -= output_fake.mean().item()
 
                 if(opt['regularization'] == "GP"):
                     # Gradient penalty 
@@ -708,8 +707,9 @@ def train_single_scale(generators, discriminators, opt):
                     TV_penalty_fake.backward(retain_graph=True)
 
                 discriminator_optimizer.step()
-                           
-        torch.autograd.set_detect_anomaly(True)
+        
+        discrim_output_map_real_img = toImg(output_real.detach().cpu().numpy()[0])       
+
         # Update generator: maximize D(G(z))
         for j in range(opt["generator_steps"]):
             generator.zero_grad()
@@ -724,7 +724,6 @@ def train_single_scale(generators, discriminators, opt):
                 gen_err_total += generator_error
                 #generator_error.backward(retain_graph=True)
                 G_loss = output.mean().item()
-                discrim_output_map_fake_img = toImg(output.detach().cpu().numpy()[0])
             if(opt['alpha_1'] > 0.0 or opt['alpha_4'] > 0.0):
                 if(opt['mode'] == "2D"):
                     opt_noise = opt["noise_amplitudes"][-1]*generator.optimal_noise[:,:,starts[0]:ends[0],starts[1]:ends[1]]
@@ -779,7 +778,9 @@ def train_single_scale(generators, discriminators, opt):
                 
             gen_err_total.backward(retain_graph=True)
             generator_optimizer.step()
-
+        
+        discrim_output_map_fake_img = toImg(output.detach().cpu().numpy()[0])
+        
         if(epoch % 50 == 0):
             if(opt['alpha_1'] > 0.0 or opt['alpha_4'] > 0.0):
                 rec_numpy = optimal_reconstruction.detach().cpu().numpy()[0]
