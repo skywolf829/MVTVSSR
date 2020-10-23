@@ -568,9 +568,13 @@ def train_single_scale(generators, discriminators, opt):
             param.requires_grad = False
     
     # Create the new generator and discriminator for this level
-    generator, num_kernels_this_scale = init_gen(len(generators), opt)
-    generator = generator.to(opt["device"])
-    discriminator = init_discrim(len(generators), opt).to(opt["device"])
+    if(len(generators) == opt['scale_in_training']):
+        generator, num_kernels_this_scale = init_gen(len(generators), opt)
+        generator = generator.to(opt["device"])
+        discriminator = init_discrim(len(generators), opt).to(opt["device"])
+    else:
+        generator = generators[-1]
+        discriminator = discriminator[-1]
 
     #print_to_log_and_console(generator, os.path.join(opt["save_folder"], opt["save_name"]),
     #    "log.txt")
@@ -585,7 +589,8 @@ def train_single_scale(generators, discriminators, opt):
     generator_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer=generator_optimizer,
     milestones=[1600],gamma=opt['gamma'])
 
-    discriminator_optimizer = optim.Adam(discriminator.parameters(), lr=opt["learning_rate"], 
+    discriminator_optimizer = optim.Adam(filter(lambda p: p.requires_grad, discriminator.parameters()), 
+    lr=opt["learning_rate"], 
     betas=(opt["beta_1"],opt["beta_2"]))
     discriminator_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer=discriminator_optimizer,
     milestones=[1600],gamma=opt['gamma'])
@@ -618,18 +623,26 @@ def train_single_scale(generators, discriminators, opt):
     for z in range(1, len(opt["resolutions"][len(generators)])):
         curr_size *= opt["resolutions"][len(generators)][z]
 
-    opt["noise_amplitudes"].append(1.0)
-    if(len(generators) > 0):
-        optimal_LR = generate_by_patch(generators, "reconstruct", opt, 
-        opt["device"], opt["patch_size"])
-        optimal_LR = F.interpolate(optimal_LR, size=opt["resolutions"][len(generators)],
-        mode=opt["upsample_mode"])
-        criterion = nn.MSELoss().to(opt['device'])
-        rmse = torch.sqrt(criterion(optimal_LR, real))
-        opt["noise_amplitudes"][-1] = rmse.item()
-    else:    
-        optimal_LR = torch.zeros(generator.get_input_shape(), device=opt["device"])
-    #writer.add_graph(generator, [optimal_LR, generator.optimal_noise])
+    if(len(opt['noise_amplitudes']) <= len(generators)):
+        opt["noise_amplitudes"].append(1.0)
+        if(len(generators) > 0):
+            optimal_LR = generate_by_patch(generators, "reconstruct", opt, 
+            opt["device"], opt["patch_size"])
+            optimal_LR = F.interpolate(optimal_LR, size=opt["resolutions"][len(generators)],
+            mode=opt["upsample_mode"])
+            criterion = nn.MSELoss().to(opt['device'])
+            rmse = torch.sqrt(criterion(optimal_LR, real))
+            opt["noise_amplitudes"][-1] = rmse.item()
+        else:    
+            optimal_LR = torch.zeros(generator.get_input_shape(), device=opt["device"])
+    else:
+        if(len(generators) > 0):
+            optimal_LR = generate_by_patch(generators, "reconstruct", opt, 
+            opt["device"], opt["patch_size"])
+            optimal_LR = F.interpolate(optimal_LR, size=opt["resolutions"][len(generators)],
+            mode=opt["upsample_mode"])
+        else:    
+            optimal_LR = torch.zeros(generator.get_input_shape(), device=opt["device"])
 
     epoch = opt['iteration_number']
     for epoch in range(opt["epochs"]):
@@ -819,6 +832,9 @@ def train_single_scale(generators, discriminators, opt):
                 writer.add_image("Divergence/%i"%len(generators), 
                 g_cm, epoch)
 
+        if(epoch % opt['save_every'] == 0):
+            save_models(generators + [generator], discriminators + [discriminator], opt)
+
         print_to_log_and_console("%i/%i: Dloss=%.02f Gloss=%.02f L1=%.04f AMD=%.02f AAD=%.02f" %
         (epoch, opt['epochs'], D_loss, G_loss, rec_loss, mags.mean(), angles.mean()), 
         os.path.join(opt["save_folder"], opt["save_name"]), "log.txt")
@@ -833,6 +849,7 @@ def train_single_scale(generators, discriminators, opt):
         writer.flush()
         discriminator_scheduler.step()
         generator_scheduler.step()
+    
     generator = reset_grads(generator, False)
     generator.eval()
     discriminator = reset_grads(discriminator, False)
