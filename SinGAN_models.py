@@ -185,13 +185,12 @@ def spatial_derivative3D_CD(field, axis, device):
 
 def calc_gradient_penalty(discrim, real_data, fake_data, LAMBDA, device):
     #print real_data.size()
-    alpha = torch.rand(1, 1)
+    alpha = torch.rand(1, 1, device=device)
     alpha = alpha.expand(real_data.size())
-    alpha = alpha.to(device)
 
     interpolates = alpha * real_data + ((1 - alpha) * fake_data)
 
-    interpolates = interpolates.to(device)
+    #interpolates = interpolates.to(device)
     interpolates = torch.autograd.Variable(interpolates, requires_grad=True)
 
     disc_interpolates = discrim(interpolates)
@@ -340,9 +339,8 @@ def init_discrim(scale, opt):
 
     discriminator = SinGAN_Discriminator(opt["resolutions"][scale], 
     opt["num_blocks"], opt["num_channels"], num_kernels, opt["kernel_size"], 
-    opt["stride"], opt["use_spectral_norm"], opt["mode"],
+    opt["stride"], opt['regularization'], opt["mode"],
     opt["device"])
-    discriminator.apply(weights_init)
     return discriminator
 
 def generate(generators, mode, opt, device, generated_image=None, start_scale=0):
@@ -964,7 +962,7 @@ class SinGAN_Generator(nn.Module):
 
 class SinGAN_Discriminator(nn.Module):
     def __init__ (self, resolution, num_blocks, num_channels, num_kernels, 
-    kernel_size, stride, use_sn, mode, device):
+    kernel_size, stride, regularization, mode, device):
         super(SinGAN_Discriminator, self).__init__()
         self.device=device
         modules = []
@@ -972,7 +970,7 @@ class SinGAN_Discriminator(nn.Module):
         self.mode = mode
         self.kernel_size = kernel_size
         self.num_blocks = num_blocks
-
+        use_sn = regularization == "SN"
         if(mode == "2D"):
             conv_layer = nn.Conv2d
             batchnorm_layer = nn.BatchNorm2d
@@ -984,35 +982,28 @@ class SinGAN_Discriminator(nn.Module):
             # The head goes from 3 channels (RGB) to num_kernels
             if i == 0:
                 modules.append(nn.Sequential(
-                    conv_layer(num_channels, num_kernels, 
-                    kernel_size, stride, 0),
-                    batchnorm_layer(num_kernels),
+                    create_conv_layer(conv_layer, num_channels, num_kernels, 
+                    kernel_size, stride, 0, use_sn),
+                    create_batchnorm_layer(batchnorm_layer, num_kernels, use_sn),
                     nn.LeakyReLU(0.2, inplace=True)
                 ))
             # The tail will go from num_kernels to 1 channel for discriminator optimization
             elif i == num_blocks-1:  
                 tail = nn.Sequential(
-                    conv_layer(num_kernels, 1, 
-                    kernel_size, stride, 0)
+                    create_conv_layer(conv_layer, num_kernels, 1, 
+                    kernel_size, stride, 0, use_sn)
                 )
                 modules.append(tail)
             # Other layers will have 32 channels for the 32 kernels
             else:
                 modules.append(nn.Sequential(
-                    conv_layer(num_kernels, num_kernels, 
-                    kernel_size, stride, 0),
-                    batchnorm_layer(num_kernels),
+                    create_conv_layer(conv_layer, num_kernels, num_kernels, 
+                    kernel_size, stride, 0, use_sn),
+                    create_batchnorm_layer(batchnorm_layer, num_kernels, use_sn),
                     nn.LeakyReLU(0.2, inplace=True)
                 ))
         self.model =  nn.Sequential(*modules)
         self.model = self.model.to(device)
-        if(use_sn):
-            for m in self.model.modules():
-                classname = m.__class__.__name__
-                if classname.find('Conv') != -1:
-                    m = torch.nn.utils.spectral_norm(m)
-                elif classname.find('Norm') != -1:
-                    m = torch.nn.utils.spectral_norm(m)
 
     def receptive_field(self):
         return (self.kernel_size-1)*self.num_blocks
@@ -1022,9 +1013,74 @@ class SinGAN_Discriminator(nn.Module):
 
 def create_batchnorm_layer(batchnorm_layer, num_kernels, use_sn):
     bnl = batchnorm_layer(num_kernels)
+    bnl.apply(weights_init)
     if(use_sn):
-        bnl = torch.nn.utils.spectral_norm(bnl)
+        bnl = SpectralNorm(bnl)
     return bnl
+
+def create_conv_layer(conv_layer, in_chan, out_chan, kernel_size, stride, padding, use_sn):
+    c = conv_layer(in_chan, out_chan, 
+                    kernel_size, stride, 0)
+    c.apply(weights_init)
+    if(use_sn):
+        c = SpectralNorm(c)
+    return c
+
+class SpectralNorm(nn.Module):
+    def __init__(self, module, name='weight', power_iterations=1):
+        super(SpectralNorm, self).__init__()
+        self.module = module
+        self.name = name
+        self.power_iterations = power_iterations
+        if not self._made_params():
+            self._make_params()
+
+    def _update_u_v(self):
+        u = getattr(self.module, self.name + "_u")
+        v = getattr(self.module, self.name + "_v")
+        w = getattr(self.module, self.name + "_bar")
+
+        height = w.data.shape[0]
+        for _ in range(self.power_iterations):
+            v.data = l2normalize(torch.mv(torch.t(w.view(height,-1).data), u.data))
+            u.data = l2normalize(torch.mv(w.view(height,-1).data, v.data))
+
+        # sigma = torch.dot(u.data, torch.mv(w.view(height,-1).data, v.data))
+        sigma = u.dot(w.view(height, -1).mv(v))
+        setattr(self.module, self.name, w / sigma.expand_as(w))
+
+    def _made_params(self):
+        try:
+            u = getattr(self.module, self.name + "_u")
+            v = getattr(self.module, self.name + "_v")
+            w = getattr(self.module, self.name + "_bar")
+            return True
+        except AttributeError:
+            return False
+
+
+    def _make_params(self):
+        w = getattr(self.module, self.name)
+
+        height = w.data.shape[0]
+        width = w.view(height, -1).data.shape[1]
+
+        u = Parameter(w.data.new(height).normal_(0, 1), requires_grad=False)
+        v = Parameter(w.data.new(width).normal_(0, 1), requires_grad=False)
+        u.data = l2normalize(u.data)
+        v.data = l2normalize(v.data)
+        w_bar = Parameter(w.data)
+
+        del self.module._parameters[self.name]
+
+        self.module.register_parameter(self.name + "_u", u)
+        self.module.register_parameter(self.name + "_v", v)
+        self.module.register_parameter(self.name + "_bar", w_bar)
+
+
+    def forward(self, *args):
+        self._update_u_v()
+        return self.module.forward(*args)
 
 class Dataset(torch.utils.data.Dataset):
     def __init__(self, dataset_location, opt):

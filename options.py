@@ -30,7 +30,6 @@ class Options():
         opt["n"]                       = 0         # Number of scales in the heirarchy, defined by the input and min_dimension_size
         opt["resolutions"]             = []        # The scales for the GAN
         opt["noise_amplitudes"]        = []
-        opt["use_spectral_norm"]       = False
         opt["downsample_mode"]         = "nearest"
         opt["upsample_mode"]           = "trilinear"
 
@@ -44,7 +43,7 @@ class Options():
         opt["physical_constraints"]    = "none"
         opt["patch_size"]              = 128
         opt["training_patch_size"]     = 64
-        opt["regularization"]          = "GP" #Either TV (total variation) or GP (gradient penalty)
+        opt["regularization"]          = "GP" #Either TV (total variation) or GP (gradient penalty) or SN 
         # GAN training info
         opt["alpha_1"]                 = 0       # Reconstruction loss coefficient
         opt["alpha_2"]                 = 1        # Adversarial loss coefficient
