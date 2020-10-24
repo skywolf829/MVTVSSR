@@ -561,23 +561,23 @@ def train_single_scale(generators, discriminators, opt):
 
     torch.manual_seed(0)
     
-    # Move all models to this GPU and make them distributed
-    for i in range(len(generators)):
-        generators[i].to(opt["device"])
-        generators[i].eval()
-        for param in generators[i].parameters():
-            param.requires_grad = False
-    
     # Create the new generator and discriminator for this level
     if(len(generators) == opt['scale_in_training']):
         generator, num_kernels_this_scale = init_gen(len(generators), opt)
         generator = generator.to(opt["device"])
         discriminator = init_discrim(len(generators), opt).to(opt["device"])
     else:
-        generator = generators[-1]
+        generator = generators[-1].to(opt['device'])
         generators.pop(len(generators)-1)
-        discriminator = discriminators[-1]
+        discriminator = discriminators[-1].to(opt['device'])
         discriminators.pop(len(discriminators)-1)
+
+    # Move all models to this GPU and make them distributed
+    for i in range(len(generators)):
+        generators[i].to(opt["device"])
+        generators[i].eval()
+        for param in generators[i].parameters():
+            param.requires_grad = False
 
     #print_to_log_and_console(generator, os.path.join(opt["save_folder"], opt["save_name"]),
     #    "log.txt")
