@@ -554,7 +554,8 @@ def train_single_scale_wrapper(generators, discriminators, opt):
     return g, d
 
 def train_single_scale(generators, discriminators, opt):
-            
+    
+    start_t = time.time()
     # Initialize the dataset
     dataset = Dataset(os.path.join(input_folder, opt["data_folder"]), opt)
 
@@ -574,7 +575,7 @@ def train_single_scale(generators, discriminators, opt):
         discriminator = init_discrim(len(generators), opt).to(opt["device"])
     else:
         generator = generators[-1]
-        discriminator = discriminator[-1]
+        discriminator = discriminators[-1]
 
     #print_to_log_and_console(generator, os.path.join(opt["save_folder"], opt["save_name"]),
     #    "log.txt")
@@ -644,6 +645,18 @@ def train_single_scale(generators, discriminators, opt):
         else:    
             optimal_LR = torch.zeros(generator.get_input_shape(), device=opt["device"])
 
+    init_time = time.time() - start_t
+    discrim_time = 0
+    gen_time = 0
+    other_time = 0
+    t_gen_fake = 0
+    t_gen_real = 0
+    t_gen_derivs = 0
+    t_gen_backward = 0
+    t_gen_L1 = 0
+    t_discrim_real = 0
+    t_discrim_fake = 0
+    t_discrim_regularization = 0
     epoch = opt['iteration_number']
     for epoch in range(opt["epochs"]):
 
@@ -672,19 +685,23 @@ def train_single_scale(generators, discriminators, opt):
             r = real[:,:,starts[0]:ends[0],starts[1]:ends[1],starts[2]:ends[2]]
         
         
-
+        start_t = time.time()
         # Update discriminator: maximize D(x) + D(G(z))
         if(opt["alpha_2"] > 0.0):            
             for j in range(opt["discriminator_steps"]):
                 discriminator.zero_grad()
+                generator.zero_grad()
                 D_loss = 0
 
                 # Train with real downscaled to this scale
+                t_discrim_real -= time.time()
                 output_real = discriminator(r)
                 discrim_error_real = -output_real.mean()
+                D_loss += discrim_error_real.mean().item()
                 discrim_error_real.backward(retain_graph=True)
-                D_loss += output_real.mean().item()
+                t_discrim_real += time.time()
 
+                t_discrim_fake -= time.time()
                 # Train with the generated image
                 if(len(generators) > 0):
                     fake_prev = generate_by_patch(generators, "random", opt, 
@@ -696,16 +713,18 @@ def train_single_scale(generators, discriminators, opt):
 
                 if(opt['mode'] == "2D"):
                     fake_prev_view = fake_prev[:,:,starts[0]:ends[0],starts[1]:ends[1]]
-                    noise = opt["noise_amplitudes"][-1] * torch.randn(fake_prev_view.shape).to(opt["device"])
+                    noise = opt["noise_amplitudes"][-1] * torch.randn(fake_prev_view.shape,device=opt['device'])
                 elif(opt['mode'] == "3D"):
                     fake_prev_view = fake_prev[:,:,starts[0]:ends[0],starts[1]:ends[1],starts[2]:ends[2]]
-                    noise = opt["noise_amplitudes"][-1] * torch.randn(fake_prev_view.shape).to(opt["device"])
+                    noise = opt["noise_amplitudes"][-1] * torch.randn(fake_prev_view.shape, device=opt['device'])
                 fake = generator(fake_prev_view, noise.detach())
                 output_fake = discriminator(fake.detach())
                 discrim_error_fake = output_fake.mean()
                 discrim_error_fake.backward(retain_graph=True)
-                D_loss -= output_fake.mean().item()
+                D_loss += discrim_error_fake.item()
 
+                t_discrim_fake += time.time()
+                t_discrim_regularization -= time.time()
                 if(opt['regularization'] == "GP"):
                     # Gradient penalty 
                     gradient_penalty = calc_gradient_penalty(discriminator, r, fake, 1, opt['device'])
@@ -716,26 +735,29 @@ def train_single_scale(generators, discriminators, opt):
                     TV_penalty_real.backward(retain_graph=True)
                     TV_penalty_fake = torch.abs(discrim_error_fake+1)
                     TV_penalty_fake.backward(retain_graph=True)
-
+                t_discrim_regularization += time.time()
                 discriminator_optimizer.step()
-        
-        discrim_output_map_real_img = toImg(output_real.detach().cpu().numpy()[0])       
-
+        discrim_time += time.time() - start_t 
+        start_t = time.time()
         # Update generator: maximize D(G(z))
         for j in range(opt["generator_steps"]):
             generator.zero_grad()
+            discriminator.zero_grad()
             G_loss = 0
             gen_err_total = 0
             loss = nn.L1Loss().to(opt["device"])
-
+            
             if(opt["alpha_2"] > 0.0):
+                t_gen_fake -= time.time()
                 fake = generator(fake_prev_view, noise.detach())
                 output = discriminator(fake)
                 generator_error = -output.mean()# * opt["alpha_2"]
-                gen_err_total += generator_error
-                #generator_error.backward(retain_graph=True)
+                generator_error.backward(retain_graph=True)
+                gen_err_total += generator_error.mean().item()
                 G_loss = output.mean().item()
+                t_gen_fake += time.time()
             if(opt['alpha_1'] > 0.0 or opt['alpha_4'] > 0.0):
+                t_gen_real -= time.time()
                 if(opt['mode'] == "2D"):
                     opt_noise = opt["noise_amplitudes"][-1]*generator.optimal_noise[:,:,starts[0]:ends[0],starts[1]:ends[1]]
                     optimal_reconstruction = generator(optimal_LR.detach()[:,:,starts[0]:ends[0],starts[1]:ends[1]], 
@@ -744,11 +766,14 @@ def train_single_scale(generators, discriminators, opt):
                     opt_noise = opt["noise_amplitudes"][-1]*generator.optimal_noise[:,:,starts[0]:ends[0],starts[1]:ends[1],starts[2]:ends[2]]
                     optimal_reconstruction = generator(optimal_LR.detach()[:,:,starts[0]:ends[0],starts[1]:ends[1],starts[2]:ends[2]], 
                     opt_noise)
+                t_gen_real += time.time()
             if(opt['alpha_1'] > 0.0):
+                t_gen_L1 -= time.time()
                 rec_loss = loss(optimal_reconstruction, r) * opt["alpha_1"]
-                gen_err_total += rec_loss
-                #rec_loss.backward(retain_graph=True)
+                rec_loss.backward(retain_graph=True)
+                gen_err_total += rec_loss.item()
                 rec_loss = rec_loss.detach()
+                t_gen_L1 += time.time()
             if(opt['alpha_3'] > 0.0):
                 if(opt["physical_constraints"] == "soft"):
                     if(opt['mode'] == "2D"):
@@ -758,16 +783,19 @@ def train_single_scale(generators, discriminators, opt):
                         g_map = TAD3D_CD(dataset.unscale(optimal_reconstruction), opt["device"])
                         g = g_map.mean()
                     phys_loss = opt["alpha_3"] * g 
-                    gen_err_total += phys_loss
-                    #phys_loss.backward(retain_graph = True)
+                    phys_loss.backward(retain_graph=True)
+                    gen_err_total += phys_loss.item()
             if(opt['alpha_4'] > 0.0):
+                t_gen_L1 -= time.time()
                 cs = torch.nn.CosineSimilarity(dim=1).to(opt['device'])
                 mags = torch.abs(torch.norm(optimal_reconstruction, dim=1) - torch.norm(r, dim=1))
                 angles = torch.abs(cs(optimal_reconstruction, r) - 1) / 2
                 r_loss = opt['alpha_4'] * (mags.mean() + angles.mean()) / 2
-                gen_err_total += r_loss
-                #r_loss.backward(retain_graph=True)
+                r_loss.backward(retain_graph=True)
+                gen_err_total += r_loss.item()
+                t_gen_L1 += time.time()
             if(opt['alpha_5'] > 0.0):
+                t_gen_derivs -= time.time()
                 real_gradient = []
                 rec_gradient = []
                 for ax1 in range(r.shape[1]):
@@ -784,14 +812,14 @@ def train_single_scale(generators, discriminators, opt):
                 rec_gradient = torch.cat(rec_gradient, 1)
                 gradient_loss = loss(real_gradient, rec_gradient)
                 gradient_loss_adj = gradient_loss * opt['alpha_5']
-                gen_err_total += gradient_loss_adj
-                #gradient_loss_adj.backward(retain_graph=True)
-                
-            gen_err_total.backward(retain_graph=True)
+                gradient_loss_adj.backward(retain_graph=True)
+                gen_err_total += gradient_loss_adj.item()
+                t_gen_derivs += time.time()
+            
             generator_optimizer.step()
         
-        discrim_output_map_fake_img = toImg(output.detach().cpu().numpy()[0])
-        
+        gen_time += time.time() - start_t
+        start_t = time.time()
         if(epoch % 50 == 0):
             if(opt['alpha_1'] > 0.0 or opt['alpha_4'] > 0.0):
                 rec_numpy = optimal_reconstruction.detach().cpu().numpy()[0]
@@ -808,15 +836,19 @@ def train_single_scale(generators, discriminators, opt):
             writer.add_image("real/%i"%len(generators), 
             real_cm.clip(0,1), epoch)
 
-            if(opt["alpha_2"] > 0.0):
+            if(opt["alpha_2"] > 0.0):                
                 fake_numpy = fake.detach().cpu().numpy()[0]
                 fake_cm = toImg(fake_numpy)
                 fake_cm -= fake_cm.min()
                 fake_cm *= (1/fake_cm.max())
                 writer.add_image("fake/%i"%len(generators), 
                 fake_cm.clip(0,1), epoch)
+
+                discrim_output_map_real_img = toImg(output_real.detach().cpu().numpy()[0])     
                 writer.add_image("discrim_map_real/%i"%len(generators), 
                 discrim_output_map_real_img, epoch)
+
+                discrim_output_map_fake_img = toImg(output.detach().cpu().numpy()[0])
                 writer.add_image("discrim_map_fake/%i"%len(generators), 
                 discrim_output_map_fake_img, epoch)
             if(opt["alpha_4"] > 0.0):
@@ -846,10 +878,25 @@ def train_single_scale(generators, discriminators, opt):
         writer.add_scalar('TAD_scale/%i'%len(generators), g, epoch)
         writer.add_scalar('Mag_loss_scale/%i'%len(generators), mags.mean(), epoch) 
         writer.add_scalar('Angle_loss_scale/%i'%len(generators), angles.mean(), epoch) 
-        writer.flush()
         discriminator_scheduler.step()
         generator_scheduler.step()
+        other_time += time.time() - start_t
     
+    plt.bar([0, 1, 2, 3], [init_time, discrim_time, gen_time, other_time], color='blue')
+    plt.ylabel("seconds")
+    plt.title("time for computation during training")
+    plt.xticks([0, 1, 2, 3], ["Init", "Discrim", "Gen", "Other"])
+    plt.show()
+    plt.bar([0, 1, 2, 3, 4], [gen_time, t_gen_fake, t_gen_real, t_gen_L1, t_gen_derivs], color='blue')
+    plt.ylabel("seconds")
+    plt.title("time for computation in generator during training")
+    plt.xticks([0, 1, 2, 3, 4], ["Full time", "fake", "real", "mag+angle", "derivs"])
+    plt.show()
+    plt.bar([0, 1, 2, 3], [discrim_time, t_discrim_real, t_discrim_fake, t_discrim_regularization], color='blue')
+    plt.ylabel("seconds")
+    plt.title("time for computation in generator during training")
+    plt.xticks([0, 1, 2, 3], ["Full time", "real", "fake", "reg"])
+    plt.show()
     generator = reset_grads(generator, False)
     generator.eval()
     discriminator = reset_grads(discriminator, False)
