@@ -575,7 +575,9 @@ def train_single_scale(generators, discriminators, opt):
         discriminator = init_discrim(len(generators), opt).to(opt["device"])
     else:
         generator = generators[-1]
+        generators.pop(len(generators)-1)
         discriminator = discriminators[-1]
+        discriminators.pop(len(discriminators)-1)
 
     #print_to_log_and_console(generator, os.path.join(opt["save_folder"], opt["save_name"]),
     #    "log.txt")
