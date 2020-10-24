@@ -581,8 +581,8 @@ def train_single_scale(generators, discriminators, opt):
     #    "log.txt")
     print_to_log_and_console("Training on %s" % (opt["device"]), 
         os.path.join(opt["save_folder"], opt["save_name"]), "log.txt")
-    print_to_log_and_console("Kernels this scale: %i" % num_kernels_this_scale, 
-        os.path.join(opt["save_folder"], opt["save_name"]), "log.txt")
+    #print_to_log_and_console("Kernels this scale: %i" % num_kernels_this_scale, 
+    #    os.path.join(opt["save_folder"], opt["save_name"]), "log.txt")
 
 
     generator_optimizer = optim.Adam(generator.parameters(), lr=opt["learning_rate"], 
