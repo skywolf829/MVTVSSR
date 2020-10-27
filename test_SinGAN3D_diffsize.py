@@ -48,11 +48,12 @@ gen_to_use = 0
 f = dataset.scale(dataset_diffsize.unscale(dataset_diffsize.__getitem__(0).to(opt['device'])))
 
 f_hr = f.to(opt['device'])
+del f
 f_lr = laplace_pyramid_downscale3D(f_hr, opt['n']-gen_to_use-1,
 opt['spatial_downscale_ratio'],
 opt['device'])
+del f_hr
 
-print(f_hr.shape)
 print(f_lr.shape)
 print(len(generators))
 
