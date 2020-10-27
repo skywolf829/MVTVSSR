@@ -93,12 +93,13 @@ def generate_patchwise(generator, LR, mode):
                 x+x_offset:x+noise.shape[4]] = result[:,:,z_offset:,y_offset:,x_offset:]
     return generated_image
 
-f_lr = F.interpolate(f_lr, size=[256, 256, 256], mode='trilinear')
-f_lr = generate_patchwise(generators[1], f_lr, "random")
+with torch.no_grad():
+    f_lr = F.interpolate(f_lr, size=[256, 256, 256], mode='trilinear')
+    f_lr = generate_patchwise(generators[1], f_lr, "random")
 
 
-print(f_lr.shape)
-f_lr = F.interpolate(f_lr, size=[512, 512, 512], mode='trilinear')
-f_lr = generate_patchwise(generators[2], f_lr, "random")
+    print(f_lr.shape)
+    f_lr = F.interpolate(f_lr, size=[512, 512, 512], mode='trilinear')
+    f_lr = generate_patchwise(generators[2], f_lr, "random")
 
 print(f_lr.shape)
