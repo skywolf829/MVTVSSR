@@ -109,8 +109,8 @@ p = PSNR(f_hr, singan_output, f_hr.max() - f_hr.min())
 print(e)
 print(p)
 singan_output = dataset.unscale(singan_output)
-singan_output = singan_output.detach().cpu().numpy()[0].swapaxes(0,3).swapaxes(0,1).swapaxes(1,2)
-m = np.linalg.norm(singan_output,axis=3)
+singan_output = singan_output.detach().cpu().numpy()[0]
+m = np.linalg.norm(singan_output,axis=0)
 
 
 from netCDF4 import Dataset
@@ -139,8 +139,8 @@ print(p)
 
 
 trilin = dataset.unscale(trilin)
-trilin = trilin.detach().cpu().numpy()[0].swapaxes(0,3).swapaxes(0,1).swapaxes(1,2)
-m = np.linalg.norm(trilin,axis=3)
+trilin = trilin.detach().cpu().numpy()[0]
+m = np.linalg.norm(trilin,axis=0)
 rootgrp = Dataset("trilinear.nc", "w", format="NETCDF4")
 velocity = rootgrp.createGroup("velocity")
 u = rootgrp.createDimension("u")
