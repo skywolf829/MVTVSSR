@@ -73,15 +73,19 @@ num_bins = int(f_fft.shape[0] / 2)
 #num_bins = 2
 bins = []
 trilin_bins = []
+gif = []
+imageio.imsave("f_fft.png", f_fft[256].cpu().numpy())
 for i in range(0, num_bins):
     radius = i * (f_fft.shape[0] / num_bins)
     shell = 5    
     sphere = get_sphere(f_fft, radius, shell)
     s = f_fft * sphere
+    gif.append(s[256].cpu().numpy())
     s_trilin = f_trilin_fft * sphere
     on_pixels = sphere.sum().item()
     bins.append(s.sum().item() / (on_pixels+1))
     trilin_bins.append(s_trilin.sum().item() / (on_pixels+1))
+imageio.mimwrite("spheres.gif", gif)
 ks = []
 dis=0.0928
 for i in range(num_bins):
