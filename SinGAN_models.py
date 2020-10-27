@@ -1184,6 +1184,11 @@ class Dataset(torch.utils.data.Dataset):
     def resolution(self):
         return self.resolution
 
+    def scale(self, data):
+        d = data.clone()
+        if(self.scale_on_magnitude):
+            d *= (1/self.max_mag)
+        return d
     def unscale(self, data):
         d = data.clone()
         if(self.scale_data):

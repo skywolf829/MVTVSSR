@@ -26,10 +26,12 @@ parser.add_argument('--data_folder',default="JHUturbulence/isotropic512coarse",t
 parser.add_argument('--device',default="cuda:0",type=str,help='Frames to use from training file')
 
 args = vars(parser.parse_args())
-
+'''
 opt = load_options(os.path.join(save_folder, args["load_from"]))
 opt["device"] = args["device"]
 opt["save_name"] = args["load_from"]
+'''
+
 '''
 generators, discriminators = load_models(opt,args["device"])
 
@@ -54,6 +56,7 @@ print(rec_cm.shape)
 imageio.imwrite("64patch_rec.png", rec_cm.swapaxes(0,2).swapaxes(0,1))
 '''
 
+'''
 a = torch.randn([1, 3, 64, 64, 64]).to(opt['device'])
 
 g = TAD3D_CD(a, opt['device'])
@@ -65,3 +68,9 @@ g = TAD3D_CD(a, opt['device'])
 
 print(a.shape)
 print(g.mean())
+'''
+a = np.load(os.path.join(input_folder, "JHUturbulence", "isotropic128_3D", "0.npy"))
+print(a.shape)
+a = a.swapaxes(0,3).swapaxes(3,2).swapaxes(2,1)
+print(a.shape)
+np.save(os.path.join(input_folder, "JHUturbulence", "isotropic128_3D", "0.npy"), a)

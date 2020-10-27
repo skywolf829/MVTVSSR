@@ -139,9 +139,9 @@ endts = 2
 ts_skip = 25
 for i in range(1, endts, ts_skip):
     print("TS %i/%i" % (i, endts))
-    f = get_full_frame_parallel(448, 576, #x
-    448, 576, #y
-    448, 576, #z
+    f = get_full_frame_parallel(256, 768, #x
+    256, 768, #y
+    256, 768, #z
     name, i, 
     "u", 3, 
     64)
@@ -149,7 +149,7 @@ for i in range(1, endts, ts_skip):
     #name,
     #str(count) + ".npy"), f[0].swapaxes(0,2).swapaxes(1,2).astype(np.float32))
     print(f.shape)
-    np.save("0.npy", f.astype(np.float32))
+    np.save("0.npy", f.astype(np.float32).swapaxes(0,3).swapaxes(3,2).swapaxes(2,1))
     count += 1
     frames.append(f[0])
 
