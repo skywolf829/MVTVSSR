@@ -52,7 +52,6 @@ del f
 f_lr = laplace_pyramid_downscale3D(f_hr, opt['n']-gen_to_use-1,
 opt['spatial_downscale_ratio'],
 opt['device'])
-del f_hr
 singan_output = f_lr.clone()
 print(f_lr.shape)
 print(len(generators))
