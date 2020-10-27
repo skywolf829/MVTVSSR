@@ -103,7 +103,6 @@ with torch.no_grad():
 
 print(singan_output.shape)
 
-trilin_output = F.interpolate(f_lr, size=[512, 512, 512], mode='trilinear')
 print("SinGAN error:")
 e = ((f_hr - singan_output)**2).mean()
 p = PSNR(f_hr, singan_output, f_hr.max() - f_hr.min())
@@ -131,6 +130,8 @@ mags[:] = m
 
 
 print("Trilinear upscaling:")
+
+trilin = F.interpolate(f_lr, size=[512, 512, 512], mode='trilinear')
 e = ((f_hr - trilin)**2).mean()
 p = PSNR(f_hr, trilin, f_hr.max() - f_hr.min())
 print(e)
