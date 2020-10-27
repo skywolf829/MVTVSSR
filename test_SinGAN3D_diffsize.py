@@ -53,7 +53,7 @@ f_lr = laplace_pyramid_downscale3D(f_hr, opt['n']-gen_to_use-1,
 opt['spatial_downscale_ratio'],
 opt['device'])
 del f_hr
-
+singan_output = f_lr.clone()
 print(f_lr.shape)
 print(len(generators))
 
@@ -94,12 +94,62 @@ def generate_patchwise(generator, LR, mode):
     return generated_image
 
 with torch.no_grad():
-    f_lr = F.interpolate(f_lr, size=[256, 256, 256], mode='trilinear')
-    f_lr = generate_patchwise(generators[1], f_lr, "random")
+    singan_output = F.interpolate(singan_output, size=[256, 256, 256], mode='trilinear')
+    singan_output = generate_patchwise(generators[1], singan_output, "random")
 
 
-    print(f_lr.shape)
-    f_lr = F.interpolate(f_lr, size=[512, 512, 512], mode='trilinear')
-    f_lr = generate_patchwise(generators[2], f_lr, "random")
+    print(singan_output.shape)
+    singan_output = F.interpolate(singan_output, size=[512, 512, 512], mode='trilinear')
+    singan_output = generate_patchwise(generators[2], singan_output, "random")
 
-print(f_lr.shape)
+print(singan_output.shape)
+
+trilin_output = F.interpolate(f_lr, size=[512, 512, 512], mode='trilinear')
+print("SinGAN error:")
+e = ((f_hr - singan_output)**2).mean()
+p = PSNR(f_hr, singan_output, f_hr.max() - f_hr.min())
+print(e)
+print(p)
+singan_output = dataset.unscale(singan_output)
+singan_output = singan_output.detach().cpu().numpy()[0].swapaxes(0,3).swapaxes(0,1).swapaxes(1,2)
+m = np.linalg.norm(singan_output,axis=3)
+
+
+from netCDF4 import Dataset
+rootgrp = Dataset("singan.nc", "w", format="NETCDF4")
+velocity = rootgrp.createGroup("velocity")
+u = rootgrp.createDimension("u")
+v = rootgrp.createDimension("v")
+w = rootgrp.createDimension("w")
+w = rootgrp.createDimension("channels", 3)
+us = rootgrp.createVariable("u", singan_output.dtype, ("u","v","w"))
+vs = rootgrp.createVariable("v", singan_output.dtype, ("u","v","w"))
+ws = rootgrp.createVariable("w", singan_output.dtype, ("u","v","w"))
+mags = rootgrp.createVariable("magnitude", singan_output.dtype, ("u","v","w"))
+velocities = rootgrp.createVariable("velocities", singan_output.dtype, ("u","v","w", "channels"))
+mags[:] = m
+
+
+
+print("Trilinear upscaling:")
+e = ((f_hr - trilin)**2).mean()
+p = PSNR(f_hr, trilin, f_hr.max() - f_hr.min())
+print(e)
+print(p)
+
+
+trilin = dataset.unscale(trilin)
+trilin = trilin.detach().cpu().numpy()[0].swapaxes(0,3).swapaxes(0,1).swapaxes(1,2)
+m = np.linalg.norm(trilin,axis=3)
+rootgrp = Dataset("trilinear.nc", "w", format="NETCDF4")
+velocity = rootgrp.createGroup("velocity")
+u = rootgrp.createDimension("u")
+v = rootgrp.createDimension("v")
+w = rootgrp.createDimension("w")
+w = rootgrp.createDimension("channels", 3)
+us = rootgrp.createVariable("u", trilin.dtype, ("u","v","w"))
+vs = rootgrp.createVariable("v", trilin.dtype, ("u","v","w"))
+ws = rootgrp.createVariable("w", trilin.dtype, ("u","v","w"))
+mags = rootgrp.createVariable("magnitude", trilin.dtype, ("u","v","w"))
+velocities = rootgrp.createVariable("velocities", trilin.dtype, ("u","v","w", "channels"))
+mags[:] = m
