@@ -786,66 +786,66 @@ def train_single_scale(generators, discriminators, opt):
                 
                 generator_optimizer.step()
             
-            if(epoch % 50 == 0):
-                if(opt['alpha_1'] > 0.0 or opt['alpha_4'] > 0.0):
-                    rec_numpy = optimal_reconstruction.detach().cpu().numpy()[0]
-                    rec_cm = toImg(rec_numpy)
-                    rec_cm -= rec_cm.min()
-                    rec_cm *= (1/rec_cm.max())
-                    writer.add_image("reconstructed/%i"%len(generators), 
-                    rec_cm.clip(0,1), epoch)
+        if(epoch % 50 == 0):
+            if(opt['alpha_1'] > 0.0 or opt['alpha_4'] > 0.0):
+                rec_numpy = optimal_reconstruction.detach().cpu().numpy()[0]
+                rec_cm = toImg(rec_numpy)
+                rec_cm -= rec_cm.min()
+                rec_cm *= (1/rec_cm.max())
+                writer.add_image("reconstructed/%i"%len(generators), 
+                rec_cm.clip(0,1), epoch)
 
-                real_numpy = r.detach().cpu().numpy()[0]
-                real_cm = toImg(real_numpy)
-                real_cm -= real_cm.min()
-                real_cm *= (1/real_cm.max())
-                writer.add_image("real/%i"%len(generators), 
-                real_cm.clip(0,1), epoch)
+            real_numpy = r.detach().cpu().numpy()[0]
+            real_cm = toImg(real_numpy)
+            real_cm -= real_cm.min()
+            real_cm *= (1/real_cm.max())
+            writer.add_image("real/%i"%len(generators), 
+            real_cm.clip(0,1), epoch)
 
-                if(opt["alpha_2"] > 0.0):                
-                    fake_numpy = fake.detach().cpu().numpy()[0]
-                    fake_cm = toImg(fake_numpy)
-                    fake_cm -= fake_cm.min()
-                    fake_cm *= (1/fake_cm.max())
-                    writer.add_image("fake/%i"%len(generators), 
-                    fake_cm.clip(0,1), epoch)
+            if(opt["alpha_2"] > 0.0):                
+                fake_numpy = fake.detach().cpu().numpy()[0]
+                fake_cm = toImg(fake_numpy)
+                fake_cm -= fake_cm.min()
+                fake_cm *= (1/fake_cm.max())
+                writer.add_image("fake/%i"%len(generators), 
+                fake_cm.clip(0,1), epoch)
 
-                    discrim_output_map_real_img = toImg(output_real.detach().cpu().numpy()[0])     
-                    writer.add_image("discrim_map_real/%i"%len(generators), 
-                    discrim_output_map_real_img, epoch)
+                discrim_output_map_real_img = toImg(output_real.detach().cpu().numpy()[0])     
+                writer.add_image("discrim_map_real/%i"%len(generators), 
+                discrim_output_map_real_img, epoch)
 
-                    discrim_output_map_fake_img = toImg(output.detach().cpu().numpy()[0])
-                    writer.add_image("discrim_map_fake/%i"%len(generators), 
-                    discrim_output_map_fake_img, epoch)
-                if(opt["alpha_4"] > 0.0):
-                    angles_cm = toImg(angles.detach().cpu().numpy())
-                    writer.add_image("angle/%i"%len(generators), 
-                    angles_cm , epoch)
+                discrim_output_map_fake_img = toImg(output.detach().cpu().numpy()[0])
+                writer.add_image("discrim_map_fake/%i"%len(generators), 
+                discrim_output_map_fake_img, epoch)
+            if(opt["alpha_4"] > 0.0):
+                angles_cm = toImg(angles.detach().cpu().numpy())
+                writer.add_image("angle/%i"%len(generators), 
+                angles_cm , epoch)
 
-                    mags_cm = toImg(mags.detach().cpu().numpy())
-                    writer.add_image("mag/%i"%len(generators), 
-                    mags_cm, epoch)
-                if(opt["alpha_3"] > 0.0):
-                    g_cm = toImg(g_map.detach().cpu().numpy()[0])
-                    writer.add_image("Divergence/%i"%len(generators), 
-                    g_cm, epoch)
+                mags_cm = toImg(mags.detach().cpu().numpy())
+                writer.add_image("mag/%i"%len(generators), 
+                mags_cm, epoch)
+            if(opt["alpha_3"] > 0.0):
+                g_cm = toImg(g_map.detach().cpu().numpy()[0])
+                writer.add_image("Divergence/%i"%len(generators), 
+                g_cm, epoch)
 
-            if(epoch % opt['save_every'] == 0):
-                save_models(generators + [generator], discriminators + [discriminator], opt)
+        if(epoch % opt['save_every'] == 0):
+            save_models(generators + [generator], discriminators + [discriminator], opt)
 
-            print_to_log_and_console("%i/%i: Dloss=%.02f Gloss=%.02f L1=%.04f AMD=%.02f AAD=%.02f" %
-            (epoch, opt['epochs'], D_loss, G_loss, rec_loss, mags.mean(), angles.mean()), 
-            os.path.join(opt["save_folder"], opt["save_name"]), "log.txt")
+        print_to_log_and_console("%i/%i: Dloss=%.02f Gloss=%.02f L1=%.04f AMD=%.02f AAD=%.02f" %
+        (epoch, opt['epochs'], D_loss, G_loss, rec_loss, mags.mean(), angles.mean()), 
+        os.path.join(opt["save_folder"], opt["save_name"]), "log.txt")
 
-            writer.add_scalar('D_loss_scale/%i'%len(generators), D_loss, epoch) 
-            writer.add_scalar('G_loss_scale/%i'%len(generators), G_loss, epoch) 
-            writer.add_scalar('L1/%i'%len(generators), rec_loss, epoch)
-            writer.add_scalar('Gradient_loss/%i'%len(generators), gradient_loss, epoch)
-            writer.add_scalar('TAD_scale/%i'%len(generators), g, epoch)
-            writer.add_scalar('Mag_loss_scale/%i'%len(generators), mags.mean(), epoch) 
-            writer.add_scalar('Angle_loss_scale/%i'%len(generators), angles.mean(), epoch) 
-            discriminator_scheduler.step()
-            generator_scheduler.step()
+        writer.add_scalar('D_loss_scale/%i'%len(generators), D_loss, epoch) 
+        writer.add_scalar('G_loss_scale/%i'%len(generators), G_loss, epoch) 
+        writer.add_scalar('L1/%i'%len(generators), rec_loss, epoch)
+        writer.add_scalar('Gradient_loss/%i'%len(generators), gradient_loss, epoch)
+        writer.add_scalar('TAD_scale/%i'%len(generators), g, epoch)
+        writer.add_scalar('Mag_loss_scale/%i'%len(generators), mags.mean(), epoch) 
+        writer.add_scalar('Angle_loss_scale/%i'%len(generators), angles.mean(), epoch) 
+        discriminator_scheduler.step()
+        generator_scheduler.step()
     
     generator = reset_grads(generator, False)
     generator.eval()
