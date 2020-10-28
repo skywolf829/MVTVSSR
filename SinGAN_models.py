@@ -652,6 +652,7 @@ def train_single_scale(generators, discriminators, opt):
     for epoch in range(opt["epochs"]):
 
         for patch_in_training in range(len(starts_all)):
+            print(patch_in_training)
             D_loss = 0
             G_loss = 0        
             gradient_loss = 0
