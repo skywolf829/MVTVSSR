@@ -647,14 +647,13 @@ def train_single_scale(generators, discriminators, opt):
         else:    
             optimal_LR = torch.zeros(generator.get_input_shape(), device=opt["device"])
 
-    epoch = opt['iteration_number']
     if(curr_size > max_dim):
         starts_all, ends_all = dataset.get_patch_ranges(real, opt["training_patch_size"], generator.receptive_field())
     else:
         starts_all = [list(np.array(real.shape[2:]) * 0)]
         ends_all = [list(np.array(real.shape[2:]))]
 
-    for epoch in range(opt["epochs"]):
+    for epoch in range(opt['iteration_number'], opt["epochs"]):
 
         for patch_in_training in range(len(starts_all)):
             D_loss = 0
@@ -836,7 +835,9 @@ def train_single_scale(generators, discriminators, opt):
                 g_cm, epoch)
 
         if(epoch % opt['save_every'] == 0):
+            opt["iteration_number"] = epoch
             save_models(generators + [generator], discriminators + [discriminator], opt)
+            
 
         print_to_log_and_console("%i/%i: Dloss=%.02f Gloss=%.02f L1=%.04f AMD=%.02f AAD=%.02f" %
         (epoch, opt['epochs'], D_loss, G_loss, rec_loss, mags.mean(), angles.mean()), 
