@@ -647,258 +647,206 @@ def train_single_scale(generators, discriminators, opt):
         else:    
             optimal_LR = torch.zeros(generator.get_input_shape(), device=opt["device"])
 
-    init_time = time.time() - start_t
-    discrim_time = 0
-    gen_time = 0
-    other_time = 0
-    t_gen_fake = 0
-    t_gen_real = 0
-    t_gen_derivs = 0
-    t_gen_backward = 0
-    t_gen_L1 = 0
-    t_discrim_real = 0
-    t_discrim_fake = 0
-    t_discrim_regularization = 0
     epoch = opt['iteration_number']
+    starts_all, ends_all = dataset.get_patch_ranges(real, opt["training_patch_size"], generator.receptive_field())
     for epoch in range(opt["epochs"]):
 
-        D_loss = 0
-        G_loss = 0        
-        gradient_loss = 0
-        rec_loss = 0        
-        g = 0
-        mags = np.zeros(1)
-        angles = np.zeros(1)
+        for patch_in_training in range(len(starts_all)):
+            D_loss = 0
+            G_loss = 0        
+            gradient_loss = 0
+            rec_loss = 0        
+            g = 0
+            mags = np.zeros(1)
+            angles = np.zeros(1)
 
-        starts = []
-        ends = []
-        if(curr_size > max_dim):
-            for z in range(0, len(opt["resolutions"][len(generators)])):
-                starts.append(random.randrange(0, opt["resolutions"][len(generators)][z] - opt["training_patch_size"]))
-                ends.append(starts[-1]+opt["training_patch_size"])
-        else:
-            for z in range(0, len(opt["resolutions"][len(generators)])):
-                starts.append(0)
-                ends.append(opt["resolutions"][len(generators)][z])
-
-        if(opt['mode'] == "2D"):
-            r = real[:,:,starts[0]:ends[0],starts[1]:ends[1]]
-        elif(opt['mode'] == "3D"):
-            r = real[:,:,starts[0]:ends[0],starts[1]:ends[1],starts[2]:ends[2]]
-        
-        
-        start_t = time.time()
-        # Update discriminator: maximize D(x) + D(G(z))
-        if(opt["alpha_2"] > 0.0):            
-            for j in range(opt["discriminator_steps"]):
-                discriminator.zero_grad()
-                generator.zero_grad()
-                D_loss = 0
-
-                # Train with real downscaled to this scale
-                t_discrim_real -= time.time()
-                output_real = discriminator(r)
-                discrim_error_real = -output_real.mean()
-                D_loss += discrim_error_real.mean().item()
-                discrim_error_real.backward(retain_graph=True)
-                t_discrim_real += time.time()
-
-                t_discrim_fake -= time.time()
-                # Train with the generated image
-                if(len(generators) > 0):
-                    fake_prev = generate_by_patch(generators, "random", opt, 
-                    opt["device"], opt["patch_size"])
-                    fake_prev = F.interpolate(fake_prev, size=opt["resolutions"][len(generators)],
-                    mode=opt["upsample_mode"])
-                else:
-                    fake_prev = torch.zeros(generator.get_input_shape()).to(opt["device"])
-
-                if(opt['mode'] == "2D"):
-                    fake_prev_view = fake_prev[:,:,starts[0]:ends[0],starts[1]:ends[1]]
-                    noise = opt["noise_amplitudes"][-1] * torch.randn(fake_prev_view.shape,device=opt['device'])
-                elif(opt['mode'] == "3D"):
-                    fake_prev_view = fake_prev[:,:,starts[0]:ends[0],starts[1]:ends[1],starts[2]:ends[2]]
-                    noise = opt["noise_amplitudes"][-1] * torch.randn(fake_prev_view.shape, device=opt['device'])
-                fake = generator(fake_prev_view, noise.detach())
-                output_fake = discriminator(fake.detach())
-                discrim_error_fake = output_fake.mean()
-                discrim_error_fake.backward(retain_graph=True)
-                D_loss += discrim_error_fake.item()
-
-                t_discrim_fake += time.time()
-                t_discrim_regularization -= time.time()
-                if(opt['regularization'] == "GP"):
-                    # Gradient penalty 
-                    gradient_penalty = calc_gradient_penalty(discriminator, r, fake, 1, opt['device'])
-                    gradient_penalty.backward()
-                elif(opt['regularization'] == "TV"):
-                    # Total variance penalty
-                    TV_penalty_real = torch.abs(-discrim_error_real-1)
-                    TV_penalty_real.backward(retain_graph=True)
-                    TV_penalty_fake = torch.abs(discrim_error_fake+1)
-                    TV_penalty_fake.backward(retain_graph=True)
-                t_discrim_regularization += time.time()
-                discriminator_optimizer.step()
-        discrim_time += time.time() - start_t 
-        start_t = time.time()
-        # Update generator: maximize D(G(z))
-        for j in range(opt["generator_steps"]):
-            generator.zero_grad()
-            discriminator.zero_grad()
-            G_loss = 0
-            gen_err_total = 0
-            loss = nn.L1Loss().to(opt["device"])
+            starts = []
+            ends = []
             
-            if(opt["alpha_2"] > 0.0):
-                t_gen_fake -= time.time()
-                fake = generator(fake_prev_view, noise.detach())
-                output = discriminator(fake)
-                generator_error = -output.mean()# * opt["alpha_2"]
-                generator_error.backward(retain_graph=True)
-                gen_err_total += generator_error.mean().item()
-                G_loss = output.mean().item()
-                t_gen_fake += time.time()
-            if(opt['alpha_1'] > 0.0 or opt['alpha_4'] > 0.0):
-                t_gen_real -= time.time()
-                if(opt['mode'] == "2D"):
-                    opt_noise = opt["noise_amplitudes"][-1]*generator.optimal_noise[:,:,starts[0]:ends[0],starts[1]:ends[1]]
-                    optimal_reconstruction = generator(optimal_LR.detach()[:,:,starts[0]:ends[0],starts[1]:ends[1]], 
-                    opt_noise)
-                elif(opt['mode'] == "3D"):
-                    opt_noise = opt["noise_amplitudes"][-1]*generator.optimal_noise[:,:,starts[0]:ends[0],starts[1]:ends[1],starts[2]:ends[2]]
-                    optimal_reconstruction = generator(optimal_LR.detach()[:,:,starts[0]:ends[0],starts[1]:ends[1],starts[2]:ends[2]], 
-                    opt_noise)
-                t_gen_real += time.time()
-            if(opt['alpha_1'] > 0.0):
-                t_gen_L1 -= time.time()
-                rec_loss = loss(optimal_reconstruction, r) * opt["alpha_1"]
-                rec_loss.backward(retain_graph=True)
-                gen_err_total += rec_loss.item()
-                rec_loss = rec_loss.detach()
-                t_gen_L1 += time.time()
-            if(opt['alpha_3'] > 0.0):
-                if(opt["physical_constraints"] == "soft"):
+            starts = starts_all[patch_in_training]
+            ends = ends_all[patch_in_training]
+            if(opt['mode'] == "2D"):
+                r = real[:,:,starts[0]:ends[0],starts[1]:ends[1]]
+            elif(opt['mode'] == "3D"):
+                r = real[:,:,starts[0]:ends[0],starts[1]:ends[1],starts[2]:ends[2]]
+            
+            
+            # Update discriminator: maximize D(x) + D(G(z))
+            if(opt["alpha_2"] > 0.0):            
+                for j in range(opt["discriminator_steps"]):
+                    discriminator.zero_grad()
+                    generator.zero_grad()
+                    D_loss = 0
+
+                    # Train with real downscaled to this scale
+                    output_real = discriminator(r)
+                    discrim_error_real = -output_real.mean()
+                    D_loss += discrim_error_real.mean().item()
+                    discrim_error_real.backward(retain_graph=True)
+
+                    # Train with the generated image
+                    if(len(generators) > 0):
+                        fake_prev = generate_by_patch(generators, "random", opt, 
+                        opt["device"], opt["patch_size"])
+                        fake_prev = F.interpolate(fake_prev, size=opt["resolutions"][len(generators)],
+                        mode=opt["upsample_mode"])
+                    else:
+                        fake_prev = torch.zeros(generator.get_input_shape()).to(opt["device"])
+
                     if(opt['mode'] == "2D"):
-                        g_map = TAD(dataset.unscale(optimal_reconstruction), opt["device"])            
-                        g = g_map.mean()
+                        fake_prev_view = fake_prev[:,:,starts[0]:ends[0],starts[1]:ends[1]]
+                        noise = opt["noise_amplitudes"][-1] * torch.randn(fake_prev_view.shape,device=opt['device'])
                     elif(opt['mode'] == "3D"):
-                        g_map = TAD3D_CD(dataset.unscale(optimal_reconstruction), opt["device"])
-                        g = g_map.mean()
-                    phys_loss = opt["alpha_3"] * g 
-                    phys_loss.backward(retain_graph=True)
-                    gen_err_total += phys_loss.item()
-            if(opt['alpha_4'] > 0.0):
-                t_gen_L1 -= time.time()
-                cs = torch.nn.CosineSimilarity(dim=1).to(opt['device'])
-                mags = torch.abs(torch.norm(optimal_reconstruction, dim=1) - torch.norm(r, dim=1))
-                angles = torch.abs(cs(optimal_reconstruction, r) - 1) / 2
-                r_loss = opt['alpha_4'] * (mags.mean() + angles.mean()) / 2
-                r_loss.backward(retain_graph=True)
-                gen_err_total += r_loss.item()
-                t_gen_L1 += time.time()
-            if(opt['alpha_5'] > 0.0):
-                t_gen_derivs -= time.time()
-                real_gradient = []
-                rec_gradient = []
-                for ax1 in range(r.shape[1]):
-                    for ax2 in range(len(r.shape[2:])):
-                        if(opt["mode"] == '2D'):
-                            r_deriv = spatial_derivative2D(r[:,ax1:ax1+1], ax2, opt['device'])
-                            rec_deriv = spatial_derivative2D(optimal_reconstruction[:,ax1:ax1+1], ax2, opt['device'])
-                        elif(opt['mode'] == '3D'):
-                            r_deriv = spatial_derivative3D_CD(r[:,ax1:ax1+1], ax2, opt['device'])
-                            rec_deriv = spatial_derivative3D_CD(optimal_reconstruction[:,ax1:ax1+1], ax2, opt['device'])
-                        real_gradient.append(r_deriv)
-                        rec_gradient.append(rec_deriv)
-                real_gradient = torch.cat(real_gradient, 1)
-                rec_gradient = torch.cat(rec_gradient, 1)
-                gradient_loss = loss(real_gradient, rec_gradient)
-                gradient_loss_adj = gradient_loss * opt['alpha_5']
-                gradient_loss_adj.backward(retain_graph=True)
-                gen_err_total += gradient_loss_adj.item()
-                t_gen_derivs += time.time()
+                        fake_prev_view = fake_prev[:,:,starts[0]:ends[0],starts[1]:ends[1],starts[2]:ends[2]]
+                        noise = opt["noise_amplitudes"][-1] * torch.randn(fake_prev_view.shape, device=opt['device'])
+                    fake = generator(fake_prev_view, noise.detach())
+                    output_fake = discriminator(fake.detach())
+                    discrim_error_fake = output_fake.mean()
+                    discrim_error_fake.backward(retain_graph=True)
+                    D_loss += discrim_error_fake.item()
+
+                    if(opt['regularization'] == "GP"):
+                        # Gradient penalty 
+                        gradient_penalty = calc_gradient_penalty(discriminator, r, fake, 1, opt['device'])
+                        gradient_penalty.backward()
+                    elif(opt['regularization'] == "TV"):
+                        # Total variance penalty
+                        TV_penalty_real = torch.abs(-discrim_error_real-1)
+                        TV_penalty_real.backward(retain_graph=True)
+                        TV_penalty_fake = torch.abs(discrim_error_fake+1)
+                        TV_penalty_fake.backward(retain_graph=True)
+                    discriminator_optimizer.step()
+
+            # Update generator: maximize D(G(z))
+            for j in range(opt["generator_steps"]):
+                generator.zero_grad()
+                discriminator.zero_grad()
+                G_loss = 0
+                gen_err_total = 0
+                loss = nn.L1Loss().to(opt["device"])
+                
+                if(opt["alpha_2"] > 0.0):
+                    fake = generator(fake_prev_view, noise.detach())
+                    output = discriminator(fake)
+                    generator_error = -output.mean()# * opt["alpha_2"]
+                    generator_error.backward(retain_graph=True)
+                    gen_err_total += generator_error.mean().item()
+                    G_loss = output.mean().item()
+                if(opt['alpha_1'] > 0.0 or opt['alpha_4'] > 0.0):
+                    if(opt['mode'] == "2D"):
+                        opt_noise = opt["noise_amplitudes"][-1]*generator.optimal_noise[:,:,starts[0]:ends[0],starts[1]:ends[1]]
+                        optimal_reconstruction = generator(optimal_LR.detach()[:,:,starts[0]:ends[0],starts[1]:ends[1]], 
+                        opt_noise)
+                    elif(opt['mode'] == "3D"):
+                        opt_noise = opt["noise_amplitudes"][-1]*generator.optimal_noise[:,:,starts[0]:ends[0],starts[1]:ends[1],starts[2]:ends[2]]
+                        optimal_reconstruction = generator(optimal_LR.detach()[:,:,starts[0]:ends[0],starts[1]:ends[1],starts[2]:ends[2]], 
+                        opt_noise)
+                if(opt['alpha_1'] > 0.0):
+                    rec_loss = loss(optimal_reconstruction, r) * opt["alpha_1"]
+                    rec_loss.backward(retain_graph=True)
+                    gen_err_total += rec_loss.item()
+                    rec_loss = rec_loss.detach()
+                if(opt['alpha_3'] > 0.0):
+                    if(opt["physical_constraints"] == "soft"):
+                        if(opt['mode'] == "2D"):
+                            g_map = TAD(dataset.unscale(optimal_reconstruction), opt["device"])            
+                            g = g_map.mean()
+                        elif(opt['mode'] == "3D"):
+                            g_map = TAD3D_CD(dataset.unscale(optimal_reconstruction), opt["device"])
+                            g = g_map.mean()
+                        phys_loss = opt["alpha_3"] * g 
+                        phys_loss.backward(retain_graph=True)
+                        gen_err_total += phys_loss.item()
+                if(opt['alpha_4'] > 0.0):
+                    cs = torch.nn.CosineSimilarity(dim=1).to(opt['device'])
+                    mags = torch.abs(torch.norm(optimal_reconstruction, dim=1) - torch.norm(r, dim=1))
+                    angles = torch.abs(cs(optimal_reconstruction, r) - 1) / 2
+                    r_loss = opt['alpha_4'] * (mags.mean() + angles.mean()) / 2
+                    r_loss.backward(retain_graph=True)
+                    gen_err_total += r_loss.item()
+                if(opt['alpha_5'] > 0.0):
+                    real_gradient = []
+                    rec_gradient = []
+                    for ax1 in range(r.shape[1]):
+                        for ax2 in range(len(r.shape[2:])):
+                            if(opt["mode"] == '2D'):
+                                r_deriv = spatial_derivative2D(r[:,ax1:ax1+1], ax2, opt['device'])
+                                rec_deriv = spatial_derivative2D(optimal_reconstruction[:,ax1:ax1+1], ax2, opt['device'])
+                            elif(opt['mode'] == '3D'):
+                                r_deriv = spatial_derivative3D_CD(r[:,ax1:ax1+1], ax2, opt['device'])
+                                rec_deriv = spatial_derivative3D_CD(optimal_reconstruction[:,ax1:ax1+1], ax2, opt['device'])
+                            real_gradient.append(r_deriv)
+                            rec_gradient.append(rec_deriv)
+                    real_gradient = torch.cat(real_gradient, 1)
+                    rec_gradient = torch.cat(rec_gradient, 1)
+                    gradient_loss = loss(real_gradient, rec_gradient)
+                    gradient_loss_adj = gradient_loss * opt['alpha_5']
+                    gradient_loss_adj.backward(retain_graph=True)
+                    gen_err_total += gradient_loss_adj.item()
+                
+                generator_optimizer.step()
             
-            generator_optimizer.step()
-        
-        gen_time += time.time() - start_t
-        start_t = time.time()
-        if(epoch % 50 == 0):
-            if(opt['alpha_1'] > 0.0 or opt['alpha_4'] > 0.0):
-                rec_numpy = optimal_reconstruction.detach().cpu().numpy()[0]
-                rec_cm = toImg(rec_numpy)
-                rec_cm -= rec_cm.min()
-                rec_cm *= (1/rec_cm.max())
-                writer.add_image("reconstructed/%i"%len(generators), 
-                rec_cm.clip(0,1), epoch)
+            if(epoch % 50 == 0):
+                if(opt['alpha_1'] > 0.0 or opt['alpha_4'] > 0.0):
+                    rec_numpy = optimal_reconstruction.detach().cpu().numpy()[0]
+                    rec_cm = toImg(rec_numpy)
+                    rec_cm -= rec_cm.min()
+                    rec_cm *= (1/rec_cm.max())
+                    writer.add_image("reconstructed/%i"%len(generators), 
+                    rec_cm.clip(0,1), epoch)
 
-            real_numpy = r.detach().cpu().numpy()[0]
-            real_cm = toImg(real_numpy)
-            real_cm -= real_cm.min()
-            real_cm *= (1/real_cm.max())
-            writer.add_image("real/%i"%len(generators), 
-            real_cm.clip(0,1), epoch)
+                real_numpy = r.detach().cpu().numpy()[0]
+                real_cm = toImg(real_numpy)
+                real_cm -= real_cm.min()
+                real_cm *= (1/real_cm.max())
+                writer.add_image("real/%i"%len(generators), 
+                real_cm.clip(0,1), epoch)
 
-            if(opt["alpha_2"] > 0.0):                
-                fake_numpy = fake.detach().cpu().numpy()[0]
-                fake_cm = toImg(fake_numpy)
-                fake_cm -= fake_cm.min()
-                fake_cm *= (1/fake_cm.max())
-                writer.add_image("fake/%i"%len(generators), 
-                fake_cm.clip(0,1), epoch)
+                if(opt["alpha_2"] > 0.0):                
+                    fake_numpy = fake.detach().cpu().numpy()[0]
+                    fake_cm = toImg(fake_numpy)
+                    fake_cm -= fake_cm.min()
+                    fake_cm *= (1/fake_cm.max())
+                    writer.add_image("fake/%i"%len(generators), 
+                    fake_cm.clip(0,1), epoch)
 
-                discrim_output_map_real_img = toImg(output_real.detach().cpu().numpy()[0])     
-                writer.add_image("discrim_map_real/%i"%len(generators), 
-                discrim_output_map_real_img, epoch)
+                    discrim_output_map_real_img = toImg(output_real.detach().cpu().numpy()[0])     
+                    writer.add_image("discrim_map_real/%i"%len(generators), 
+                    discrim_output_map_real_img, epoch)
 
-                discrim_output_map_fake_img = toImg(output.detach().cpu().numpy()[0])
-                writer.add_image("discrim_map_fake/%i"%len(generators), 
-                discrim_output_map_fake_img, epoch)
-            if(opt["alpha_4"] > 0.0):
-                angles_cm = toImg(angles.detach().cpu().numpy())
-                writer.add_image("angle/%i"%len(generators), 
-                angles_cm , epoch)
+                    discrim_output_map_fake_img = toImg(output.detach().cpu().numpy()[0])
+                    writer.add_image("discrim_map_fake/%i"%len(generators), 
+                    discrim_output_map_fake_img, epoch)
+                if(opt["alpha_4"] > 0.0):
+                    angles_cm = toImg(angles.detach().cpu().numpy())
+                    writer.add_image("angle/%i"%len(generators), 
+                    angles_cm , epoch)
 
-                mags_cm = toImg(mags.detach().cpu().numpy())
-                writer.add_image("mag/%i"%len(generators), 
-                mags_cm, epoch)
-            if(opt["alpha_3"] > 0.0):
-                g_cm = toImg(g_map.detach().cpu().numpy()[0])
-                writer.add_image("Divergence/%i"%len(generators), 
-                g_cm, epoch)
+                    mags_cm = toImg(mags.detach().cpu().numpy())
+                    writer.add_image("mag/%i"%len(generators), 
+                    mags_cm, epoch)
+                if(opt["alpha_3"] > 0.0):
+                    g_cm = toImg(g_map.detach().cpu().numpy()[0])
+                    writer.add_image("Divergence/%i"%len(generators), 
+                    g_cm, epoch)
 
-        if(epoch % opt['save_every'] == 0):
-            save_models(generators + [generator], discriminators + [discriminator], opt)
+            if(epoch % opt['save_every'] == 0):
+                save_models(generators + [generator], discriminators + [discriminator], opt)
 
-        print_to_log_and_console("%i/%i: Dloss=%.02f Gloss=%.02f L1=%.04f AMD=%.02f AAD=%.02f" %
-        (epoch, opt['epochs'], D_loss, G_loss, rec_loss, mags.mean(), angles.mean()), 
-        os.path.join(opt["save_folder"], opt["save_name"]), "log.txt")
+            print_to_log_and_console("%i/%i: Dloss=%.02f Gloss=%.02f L1=%.04f AMD=%.02f AAD=%.02f" %
+            (epoch, opt['epochs'], D_loss, G_loss, rec_loss, mags.mean(), angles.mean()), 
+            os.path.join(opt["save_folder"], opt["save_name"]), "log.txt")
 
-        writer.add_scalar('D_loss_scale/%i'%len(generators), D_loss, epoch) 
-        writer.add_scalar('G_loss_scale/%i'%len(generators), G_loss, epoch) 
-        writer.add_scalar('L1/%i'%len(generators), rec_loss, epoch)
-        writer.add_scalar('Gradient_loss/%i'%len(generators), gradient_loss, epoch)
-        writer.add_scalar('TAD_scale/%i'%len(generators), g, epoch)
-        writer.add_scalar('Mag_loss_scale/%i'%len(generators), mags.mean(), epoch) 
-        writer.add_scalar('Angle_loss_scale/%i'%len(generators), angles.mean(), epoch) 
-        discriminator_scheduler.step()
-        generator_scheduler.step()
-        other_time += time.time() - start_t
+            writer.add_scalar('D_loss_scale/%i'%len(generators), D_loss, epoch) 
+            writer.add_scalar('G_loss_scale/%i'%len(generators), G_loss, epoch) 
+            writer.add_scalar('L1/%i'%len(generators), rec_loss, epoch)
+            writer.add_scalar('Gradient_loss/%i'%len(generators), gradient_loss, epoch)
+            writer.add_scalar('TAD_scale/%i'%len(generators), g, epoch)
+            writer.add_scalar('Mag_loss_scale/%i'%len(generators), mags.mean(), epoch) 
+            writer.add_scalar('Angle_loss_scale/%i'%len(generators), angles.mean(), epoch) 
+            discriminator_scheduler.step()
+            generator_scheduler.step()
     
-    plt.bar([0, 1, 2, 3], [init_time, discrim_time, gen_time, other_time], color='blue')
-    plt.ylabel("seconds")
-    plt.title("time for computation during training")
-    plt.xticks([0, 1, 2, 3], ["Init", "Discrim", "Gen", "Other"])
-    plt.show()
-    plt.bar([0, 1, 2, 3, 4], [gen_time, t_gen_fake, t_gen_real, t_gen_L1, t_gen_derivs], color='blue')
-    plt.ylabel("seconds")
-    plt.title("time for computation in generator during training")
-    plt.xticks([0, 1, 2, 3, 4], ["Full time", "fake", "real", "mag+angle", "derivs"])
-    plt.show()
-    plt.bar([0, 1, 2, 3], [discrim_time, t_discrim_real, t_discrim_fake, t_discrim_regularization], color='blue')
-    plt.ylabel("seconds")
-    plt.title("time for computation in generator during training")
-    plt.xticks([0, 1, 2, 3], ["Full time", "real", "fake", "reg"])
-    plt.show()
     generator = reset_grads(generator, False)
     generator.eval()
     discriminator = reset_grads(discriminator, False)
@@ -1200,6 +1148,25 @@ class Dataset(torch.utils.data.Dataset):
         elif(self.scale_on_magnitude):
             d *= self.max_mag
         return d
+
+    def get_patch_ranges(self, frame, patch_size, receptive_field):
+        starts = []
+        rf = receptive_field
+        ends = []
+        for z in range(0,frame.shape[2], patch_size-2*rf):
+            z = min(z, max(0, frame.shape[2] - patch_size))
+            z_stop = min(frame.shape[2], z + patch_size)
+            for y in range(0,frame.shape[3], patch_size-2*rf):
+                y = min(y, max(0, frame.shape[3] - patch_size))
+                y_stop = min(frame.shape[3], y + patch_size)
+
+                for x in range(0,frame.shape[4], patch_size-2*rf):
+                    x = min(x, max(0, frame.shape[4] - patch_size))
+                    x_stop = min(frame.shape[4], x + patch_size)
+
+                    starts.append([z, y, x])
+                    ends.append([z_stop, y_stop, x_stop])
+        return starts, ends
 
     def __getitem__(self, index):
         data = np.load(os.path.join(self.dataset_location, str(index) + ".npy"))

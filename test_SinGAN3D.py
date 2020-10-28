@@ -89,7 +89,7 @@ mags[:] = m
 print("Trilinear upscaling:")
 print(f_lr.shape)
 trilin = F.interpolate(f_lr, 
-size=generators[-1].resolution, mode=opt["upsample_mode"])
+size=generators[-1].resolution, mode=opt["upsample_mode"], align_corners=True)
 print(trilin.shape)
 e = ((f_hr - trilin)**2).mean()
 p = PSNR(f_hr, trilin, f_hr.max() - f_hr.min())

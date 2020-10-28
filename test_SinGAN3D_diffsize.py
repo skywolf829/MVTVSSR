@@ -92,12 +92,12 @@ def generate_patchwise(generator, LR, mode):
     return generated_image
 
 with torch.no_grad():
-    singan_output = F.interpolate(singan_output, size=[256, 256, 256], mode='trilinear')
+    singan_output = F.interpolate(singan_output, size=[256, 256, 256], mode='trilinear', align_corners=True)
     singan_output = generate_patchwise(generators[1], singan_output, "random")
 
 
     print(singan_output.shape)
-    singan_output = F.interpolate(singan_output, size=[512, 512, 512], mode='trilinear')
+    singan_output = F.interpolate(singan_output, size=[512, 512, 512], mode='trilinear', align_corners=True)
     singan_output = generate_patchwise(generators[2], singan_output, "random")
 
 print(singan_output.shape)
@@ -130,7 +130,7 @@ mags[:] = m
 
 print("Trilinear upscaling:")
 
-trilin = F.interpolate(f_lr, size=[512, 512, 512], mode='trilinear')
+trilin = F.interpolate(f_lr, size=[512, 512, 512], mode='trilinear', align_corners=True)
 e = ((f_hr - trilin)**2).mean()
 p = PSNR(f_hr, trilin, f_hr.max() - f_hr.min())
 print(e)
