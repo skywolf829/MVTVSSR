@@ -350,7 +350,7 @@ def generate(generators, mode, opt, device, generated_image=None, start_scale=0)
         
         for i in range(0, len(generators)):
             generated_image = F.interpolate(generated_image, 
-            size=generators[i].resolution, mode=opt["upsample_mode"])
+            size=generators[i].resolution, mode=opt["upsample_mode"], align_corners=True)
             
             if(mode == "reconstruct"):
                 noise = generators[i].optimal_noise
@@ -375,7 +375,7 @@ generated_image=None, start_scale=0):
             rf = int(generators[i].receptive_field() / 2)
             
             LR = F.interpolate(generated_image, 
-            size=generators[i].resolution, mode=opt["upsample_mode"])
+            size=generators[i].resolution, mode=opt["upsample_mode"], align_corners=True)
             generated_image = torch.zeros(generators[i].get_input_shape()).to(device)
             if(opt['mode'] == "2D"):
                 for y in range(0,generated_image.shape[2], patch_size-2*rf):
@@ -456,11 +456,11 @@ def super_resolution(generator, frame, factor, opt, device):
     r = 1 / opt["spatial_downscale_ratio"]
     curr_r = 1.0
     while(curr_r * r < factor):
-        frame = F.interpolate(frame, scale_factor=r,mode=opt["upsample_mode"])
+        frame = F.interpolate(frame, scale_factor=r,mode=opt["upsample_mode"], align_corners=True)
         noise = torch.randn(frame.shape).to(device)
         frame = generator(frame, opt["noise_amplitudes"][-1]*noise)
         curr_r *= r
-    frame = F.interpolate(frame, size=full_size, mode=opt["upsample_mode"])
+    frame = F.interpolate(frame, size=full_size, mode=opt["upsample_mode"], align_corners=True)
     noise = torch.randn(frame.shape).to(device)
     noise = torch.zeros(frame.shape).to(device)
     frame = generator(frame, opt["noise_amplitudes"][-1]*noise)
@@ -632,7 +632,7 @@ def train_single_scale(generators, discriminators, opt):
             optimal_LR = generate_by_patch(generators, "reconstruct", opt, 
             opt["device"], opt["patch_size"])
             optimal_LR = F.interpolate(optimal_LR, size=opt["resolutions"][len(generators)],
-            mode=opt["upsample_mode"])
+            mode=opt["upsample_mode"], align_corners=True)
             criterion = nn.MSELoss().to(opt['device'])
             rmse = torch.sqrt(criterion(optimal_LR, real))
             opt["noise_amplitudes"][-1] = rmse.item()
@@ -643,7 +643,7 @@ def train_single_scale(generators, discriminators, opt):
             optimal_LR = generate_by_patch(generators, "reconstruct", opt, 
             opt["device"], opt["patch_size"])
             optimal_LR = F.interpolate(optimal_LR, size=opt["resolutions"][len(generators)],
-            mode=opt["upsample_mode"])
+            mode=opt["upsample_mode"], align_corners=True)
         else:    
             optimal_LR = torch.zeros(generator.get_input_shape(), device=opt["device"])
 

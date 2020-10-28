@@ -139,9 +139,9 @@ endts = 2
 ts_skip = 25
 for i in range(1, endts, ts_skip):
     print("TS %i/%i" % (i, endts))
-    f = get_full_frame_parallel(256, 768, #x
-    256, 768, #y
-    256, 768, #z
+    f = get_full_frame_parallel(448, 576, #x
+    448, 576, #y
+    448, 576, #z
     name, i, 
     "u", 3, 
     64)

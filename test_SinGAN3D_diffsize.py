@@ -40,7 +40,6 @@ for i in range(len(discriminators)):
     discriminators[i].eval()
 
 dataset = Dataset(os.path.join(input_folder, args["data_folder"]), opt)
-
 dataset_diffsize = Dataset(os.path.join(input_folder, args["data_folder_diffsize"]), opt)
 
 gen_to_use = 0
