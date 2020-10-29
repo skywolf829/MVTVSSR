@@ -63,7 +63,7 @@ class Options():
         # Info during training (to continue if it stopped)
         opt["scale_in_training"]       = 0
         opt["iteration_number"]        = 0
-        opt["save_every"]              = 250
+        opt["save_every"]              = 100
         opt["save_training_loss"]      = True
 
         return opt
