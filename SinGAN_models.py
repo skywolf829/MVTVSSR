@@ -377,12 +377,13 @@ generated_image=None, start_scale=0):
             LR = F.interpolate(generated_image, 
             size=generators[i].resolution, mode=opt["upsample_mode"], align_corners=True)
             generated_image = torch.zeros(generators[i].get_input_shape()).to(device)
+            
             if(opt['mode'] == "2D"):
-                for y in range(0,generated_image.shape[2], patch_size-2*rf):
+                for y in range(0,max(1,generated_image.shape[2]-patch_size+1), patch_size-2*rf):
                     y = min(y, max(0, generated_image.shape[2] - patch_size))
                     y_stop = min(generated_image.shape[2], y + patch_size)
 
-                    for x in range(0,generated_image.shape[3], patch_size-2*rf):
+                    for x in range(0,max(1,generated_image.shape[3]-patch_size+1), patch_size-2*rf):
                         x = min(x, max(0, generated_image.shape[3] - patch_size))
                         x_stop = min(generated_image.shape[3], x + patch_size)
                         #if(i == len(generators) - 1):
@@ -406,14 +407,15 @@ generated_image=None, start_scale=0):
                         x+x_offset:x+noise.shape[3]] = result[:,:,y_offset:,x_offset:]
 
             elif(opt['mode'] == '3D'):
-                for z in range(0,generated_image.shape[2], patch_size-2*rf):
+                for z in range(0,max(1, generated_image.shape[2]-patch_size+1), patch_size-2*rf):
                     z = min(z, max(0, generated_image.shape[2] - patch_size))
                     z_stop = min(generated_image.shape[2], z + patch_size)
-                    for y in range(0,generated_image.shape[3], patch_size-2*rf):
+
+                    for y in range(0,max(1, generated_image.shape[3]-patch_size+1), patch_size-2*rf):
                         y = min(y, max(0, generated_image.shape[3] - patch_size))
                         y_stop = min(generated_image.shape[3], y + patch_size)
 
-                        for x in range(0,generated_image.shape[4], patch_size-2*rf):
+                        for x in range(0,max(1, generated_image.shape[4]-patch_size+1), patch_size-2*rf):
                             x = min(x, max(0, generated_image.shape[4] - patch_size))
                             x_stop = min(generated_image.shape[4], x + patch_size)
 
@@ -435,6 +437,8 @@ generated_image=None, start_scale=0):
                             z+z_offset:z+noise.shape[2],
                             y+y_offset:y+noise.shape[3],
                             x+x_offset:x+noise.shape[4]] = result[:,:,z_offset:,y_offset:,x_offset:]
+
+
     #seq.append(generated_image.detach().cpu().numpy()[0].swapaxes(0,2).swapaxes(0,1))
     #seq = np.array(seq)
     #seq -= seq.min()
@@ -1159,14 +1163,15 @@ class Dataset(torch.utils.data.Dataset):
         starts = []
         rf = receptive_field
         ends = []
-        for z in range(0,frame.shape[2], patch_size-2*rf):
+        for z in range(0,max(1,frame.shape[2]-patch_size+1), patch_size-2*rf):
             z = min(z, max(0, frame.shape[2] - patch_size))
             z_stop = min(frame.shape[2], z + patch_size)
-            for y in range(0,frame.shape[3], patch_size-2*rf):
+            
+            for y in range(0, max(1,frame.shape[3]-patch_size+1), patch_size-2*rf):
                 y = min(y, max(0, frame.shape[3] - patch_size))
                 y_stop = min(frame.shape[3], y + patch_size)
 
-                for x in range(0,frame.shape[4], patch_size-2*rf):
+                for x in range(0, max(1,frame.shape[4]-patch_size+1), patch_size-2*rf):
                     x = min(x, max(0, frame.shape[4] - patch_size))
                     x_stop = min(frame.shape[4], x + patch_size)
 
