@@ -20,7 +20,7 @@ save_folder = os.path.join(MVTVSSR_folder_path, "SavedModels")
 
 parser = argparse.ArgumentParser(description='Test a trained model')
 
-parser.add_argument('--load_from',default="128_SN_0.5")
+parser.add_argument('--load_from',default="128_GP_0.5_k48")
 parser.add_argument('--data_folder',default="JHUturbulence/isotropic128_3D",type=str,help='File to test on')
 parser.add_argument('--device',default="cuda:0",type=str,help='Frames to use from training file')
 
@@ -55,15 +55,47 @@ print(f_hr.shape)
 print(f_lr.shape)
 print(len(generators))
 
+
+
+
+
+
+
+
+
+
+
+
+
 print("SinGAN upscaling:")
+from netCDF4 import Dataset
+rootgrp = Dataset("singan.nc", "w", format="NETCDF4")
+velocity = rootgrp.createGroup("velocity")
+u = rootgrp.createDimension("u")
+v = rootgrp.createDimension("v")
+w = rootgrp.createDimension("w")
+w = rootgrp.createDimension("channels", 3)
+us = rootgrp.createVariable("u", np.float32, ("u","v","w"))
+vs = rootgrp.createVariable("v", np.float32, ("u","v","w"))
+ws = rootgrp.createVariable("w", np.float32, ("u","v","w"))
+mags = rootgrp.createVariable("magnitude", np.float32, ("u","v","w"))
+err = rootgrp.createVariable("error", np.float32, ("u","v","w"))
+velocities = rootgrp.createVariable("velocities", np.float32, ("u","v","w", "channels"))
+
 singan_output = generate_by_patch(generators, 
 "reconstruct", opt, 
 opt['device'], opt['patch_size'], 
 generated_image=f_lr, start_scale=gen_to_use+1)
 
+
+us[:] = singan_output[0,0,:,:,:].cpu().numpy()
+vs[:] = singan_output[0,1,:,:,:].cpu().numpy()
+ws[:] = singan_output[0,2,:,:,:].cpu().numpy()
+
 print(singan_output.shape)
 print("SinGAN error:")
-e = ((f_hr - singan_output)**2).mean()
+e_field = (f_hr - singan_output)**2
+e = e_field.mean()
 p = PSNR(f_hr, singan_output, f_hr.max() - f_hr.min())
 print(e)
 print(p)
@@ -72,26 +104,53 @@ singan_output = singan_output.detach().cpu().numpy()[0].swapaxes(0,3).swapaxes(0
 m = np.linalg.norm(singan_output,axis=3)
 print(singan_output.shape)
 print(m.shape)
-from netCDF4 import Dataset
-rootgrp = Dataset("singan.nc", "w", format="NETCDF4")
+
+mags[:] = m
+err[:] = e_field[0].cpu().numpy().sum(axis=0)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+print("Trilinear upscaling:")
+rootgrp = Dataset("trilinear.nc", "w", format="NETCDF4")
 velocity = rootgrp.createGroup("velocity")
 u = rootgrp.createDimension("u")
 v = rootgrp.createDimension("v")
 w = rootgrp.createDimension("w")
 w = rootgrp.createDimension("channels", 3)
-us = rootgrp.createVariable("u", singan_output.dtype, ("u","v","w"))
-vs = rootgrp.createVariable("v", singan_output.dtype, ("u","v","w"))
-ws = rootgrp.createVariable("w", singan_output.dtype, ("u","v","w"))
-mags = rootgrp.createVariable("magnitude", singan_output.dtype, ("u","v","w"))
-velocities = rootgrp.createVariable("velocities", singan_output.dtype, ("u","v","w", "channels"))
-mags[:] = m
+us = rootgrp.createVariable("u", np.float32, ("u","v","w"))
+vs = rootgrp.createVariable("v", np.float32, ("u","v","w"))
+ws = rootgrp.createVariable("w", np.float32, ("u","v","w"))
+err = rootgrp.createVariable("error", np.float32, ("u","v","w"))
+mags = rootgrp.createVariable("magnitude", np.float32, ("u","v","w"))
+velocities = rootgrp.createVariable("velocities", np.float32, ("u","v","w", "channels"))
 
-print("Trilinear upscaling:")
+
+
 print(f_lr.shape)
 trilin = F.interpolate(f_lr, 
 size=generators[-1].resolution, mode=opt["upsample_mode"], align_corners=True)
+
+us[:] = trilin[0,0,:,:,:].cpu().numpy()
+vs[:] = trilin[0,1,:,:,:].cpu().numpy()
+ws[:] = trilin[0,2,:,:,:].cpu().numpy()
+
 print(trilin.shape)
-e = ((f_hr - trilin)**2).mean()
+e_field = (f_hr - trilin)**2
+e = e_field.mean()
 p = PSNR(f_hr, trilin, f_hr.max() - f_hr.min())
 print(e)
 print(p)
@@ -100,17 +159,8 @@ trilin = trilin.detach().cpu().numpy()[0].swapaxes(0,3).swapaxes(0,1).swapaxes(1
 m = np.linalg.norm(trilin,axis=3)
 print(trilin.shape)
 print(m.shape)
-rootgrp = Dataset("trilinear.nc", "w", format="NETCDF4")
-velocity = rootgrp.createGroup("velocity")
-u = rootgrp.createDimension("u")
-v = rootgrp.createDimension("v")
-w = rootgrp.createDimension("w")
-w = rootgrp.createDimension("channels", 3)
-us = rootgrp.createVariable("u", trilin.dtype, ("u","v","w"))
-vs = rootgrp.createVariable("v", trilin.dtype, ("u","v","w"))
-ws = rootgrp.createVariable("w", trilin.dtype, ("u","v","w"))
-mags = rootgrp.createVariable("magnitude", trilin.dtype, ("u","v","w"))
-velocities = rootgrp.createVariable("velocities", trilin.dtype, ("u","v","w", "channels"))
+
 mags[:] = m
+err[:] = e_field[0].cpu().numpy().sum(axis=0)
 
 

@@ -70,22 +70,18 @@ if __name__ == '__main__':
     save_folder = os.path.join(MVTVSSR_folder_path, "SavedModels")
 
 
-    opt = Options.get_default()
-
-    # Read arguments and update our options
-    for k in args.keys():
-        if args[k] is not None:
-            opt[k] = args[k]
-
-    dataset = Dataset(os.path.join(input_folder, opt["data_folder"]), opt)
-
-    # Determine scales
-    init_scales(opt, dataset)
-
     if(args['load_from'] is None):
         # Init models
         generators = []
         discriminators = []
+        opt = Options.get_default()
+
+        # Read arguments and update our options
+        for k in args.keys():
+            if args[k] is not None:
+                opt[k] = args[k]
+         # Determine scales
+        init_scales(opt, dataset)
     else:        
         opt = load_options(os.path.join(save_folder, args["load_from"]))
         opt["device"] = args["device"]
@@ -94,6 +90,14 @@ if __name__ == '__main__':
             if args[k] is not None:
                 opt[k] = args[k]
         generators, discriminators = load_models(opt,args["device"])
+
+    
+
+    dataset = Dataset(os.path.join(input_folder, opt["data_folder"]), opt)
+
+   
+
+
 
     
     now = datetime.datetime.now()

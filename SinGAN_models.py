@@ -62,18 +62,18 @@ def TAD3D(field, device):
 
 def curl3D(field, device):
     dzdy = spatial_derivative3D_CD(field[:,2:3], 1, device)
-    dydz = spatial_derivative3D_CD(field[:,1:2], 0, device)
-    dxdz = spatial_derivative3D_CD(field[:,0:1], 0, device)
-    dzdx = spatial_derivative3D_CD(field[:,2:3], 2, device)
-    dydx = spatial_derivative3D_CD(field[:,1:2], 2, device)
+    dydz = spatial_derivative3D_CD(field[:,1:2], 2, device)
+    dxdz = spatial_derivative3D_CD(field[:,0:1], 2, device)
+    dzdx = spatial_derivative3D_CD(field[:,2:3], 0, device)
+    dydx = spatial_derivative3D_CD(field[:,1:2], 0, device)
     dxdy = spatial_derivative3D_CD(field[:,0:1], 1, device)
     output = torch.cat((dzdy-dydz,dxdz-dzdx,dydx-dxdy), 1)
     return output
 
 def TAD3D_CD(field, device):
-    tx = spatial_derivative3D_CD(field[:,0:1,:,:,:], 2, device)
+    tx = spatial_derivative3D_CD(field[:,0:1,:,:,:], 0, device)
     ty = spatial_derivative3D_CD(field[:,1:2,:,:,:], 1, device)
-    tz = spatial_derivative3D_CD(field[:,2:3,:,:,:], 0, device)
+    tz = spatial_derivative3D_CD(field[:,2:3,:,:,:], 2, device)
     g = torch.abs(tx + ty + tz)
     return g
 
@@ -101,34 +101,6 @@ def spatial_derivative2D(field, axis, device):
         weights = weights.view(1, 1, 3, 3)
         field = m(field)
         output = F.conv2d(field, weights)
-    return output
-
-def spatial_derivative3D(field, axis, device):
-    m = nn.ReplicationPad3d(1)
-    if(axis == 0):
-        weights = torch.tensor(np.array([
-            [[-1/16, -2/16, -1/16], [0, 0, 0], [1/16, 2/16, 1/16]],
-            [[-2/16, -4/16, -2/16], [0, 0, 0], [2/16, 4/16, 2/16]],
-            [[-1/16, -2/16, -1/16], [0, 0, 0], [1/16, 2/16, 1/16]]]
-            )
-            .astype(np.float32)).to(device)
-    elif(axis == 1):
-        weights = torch.tensor(np.array([
-            [[-1/16, 0, 1/16], [-2/16, 0, 2/16], [-1/16, 0, 1/16]],
-            [[-2/16, 0, 2/16], [-4/16, 0, 4/16], [-2/16, 0, 2/16]],
-            [[-1/16, 0, 1/16], [-2/16, 0, 2/16], [-1/16, 0, 1/16]]]
-            )
-            .astype(np.float32)).to(device)
-    elif(axis == 2):
-        weights = torch.tensor(np.array([
-            [[-1/16, -2/16, -1/16], [-2/16, -4/16, -2/16], [-1/16, -2/16, -1/16]],
-            [[    0,     0,     0], [    0,     0,     0], [    0,     0,     0]],
-            [[ 1/16,  2/16,  1/16], [ 2/16,  4/16,  2/16], [ 1/16,  2/16,  1/16]]]
-            )
-            .astype(np.float32)).to(device)
-    weights = weights.view(1, 1, 3, 3, 3)
-    field = m(field)
-    output = F.conv3d(field, weights)
     return output
 
 def spatial_derivative3D_CD(field, axis, device):

@@ -139,9 +139,9 @@ endts = 2
 ts_skip = 25
 for i in range(1, endts, ts_skip):
     print("TS %i/%i" % (i, endts))
-    f = get_full_frame_parallel(448, 576, #x
-    448, 576, #y
-    448, 576, #z
+    f = get_full_frame_parallel(256, 768, #x
+    256, 768, #y
+    256, 768, #z
     name, i, 
     "u", 3, 
     64)
@@ -170,6 +170,10 @@ ws = rootgrp.createVariable("w", f.dtype, ("u","v","w"))
 mags = rootgrp.createVariable("magnitude", f.dtype, ("u","v","w"))
 velocities = rootgrp.createVariable("velocities", f.dtype, ("u","v","w", "channels"))
 mags[:] = np.linalg.norm(f,axis=3)
+us[:] = f[:,:,:,0]
+vs[:] = f[:,:,:,1]
+ws[:] = f[:,:,:,2]
+
 #velocities[:] = f
 
 

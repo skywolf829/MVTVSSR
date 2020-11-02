@@ -20,7 +20,7 @@ save_folder = os.path.join(MVTVSSR_folder_path, "SavedModels")
 
 parser = argparse.ArgumentParser(description='Test a trained model')
 
-parser.add_argument('--load_from',default="128_SN_0.5")
+parser.add_argument('--load_from',default="128_GP_0.5")
 parser.add_argument('--data_folder',default="JHUturbulence/isotropic128_3D",type=str,help='File to test on')
 parser.add_argument('--data_folder_diffsize',default="JHUturbulence/isotropic512_3D",type=str,help='File to test on')
 parser.add_argument('--device',default="cuda:0",type=str,help='Frames to use from training file')
@@ -72,7 +72,8 @@ def generate_patchwise(generator, LR, mode):
                 x_stop = min(generated_image.shape[4], x + patch_size)
 
                 if(mode == "reconstruct"):
-                    noise = generator.optimal_noise[:,:,z:z_stop,y:y_stop,x:x_stop]
+                    #noise = generator.optimal_noise[:,:,z:z_stop,y:y_stop,x:x_stop]
+                    noise = torch.zeros([1, 3,z_stop-z,y_stop-y,x_stop-x], device="cuda")
                 elif(mode == "random"):
                     noise = torch.randn([generated_image.shape[0], generated_image.shape[1],
                     z_stop-z,y_stop-y,x_stop-x], device=opt['device'])
@@ -93,23 +94,17 @@ def generate_patchwise(generator, LR, mode):
 
 with torch.no_grad():
     singan_output = F.interpolate(singan_output, size=[256, 256, 256], mode='trilinear', align_corners=True)
-    singan_output = generate_patchwise(generators[1], singan_output, "random")
+    singan_output = generate_patchwise(generators[1], singan_output, "reconstruct")
 
 
     print(singan_output.shape)
     singan_output = F.interpolate(singan_output, size=[512, 512, 512], mode='trilinear', align_corners=True)
-    singan_output = generate_patchwise(generators[2], singan_output, "random")
+    singan_output = generate_patchwise(generators[2], singan_output, "reconstruct")
 
 print(singan_output.shape)
 
 print("SinGAN error:")
-e = ((f_hr - singan_output)**2).mean()
-p = PSNR(f_hr, singan_output, f_hr.max() - f_hr.min())
-print(e)
-print(p)
-singan_output = dataset.unscale(singan_output)
-singan_output = singan_output.detach().cpu().numpy()[0].swapaxes(0,3).swapaxes(0,1).swapaxes(1,2)
-m = np.linalg.norm(singan_output,axis=3)
+
 
 
 from netCDF4 import Dataset
@@ -119,36 +114,59 @@ u = rootgrp.createDimension("u")
 v = rootgrp.createDimension("v")
 w = rootgrp.createDimension("w")
 w = rootgrp.createDimension("channels", 3)
-us = rootgrp.createVariable("u", singan_output.dtype, ("u","v","w"))
-vs = rootgrp.createVariable("v", singan_output.dtype, ("u","v","w"))
-ws = rootgrp.createVariable("w", singan_output.dtype, ("u","v","w"))
-mags = rootgrp.createVariable("magnitude", singan_output.dtype, ("u","v","w"))
-velocities = rootgrp.createVariable("velocities", singan_output.dtype, ("u","v","w", "channels"))
+us = rootgrp.createVariable("u", np.float32, ("u","v","w"))
+vs = rootgrp.createVariable("v", np.float32, ("u","v","w"))
+ws = rootgrp.createVariable("w", np.float32, ("u","v","w"))
+mags = rootgrp.createVariable("magnitude", np.float32, ("u","v","w"))
+errs = rootgrp.createVariable("error", np.float32, ("u","v","w"))
+velocities = rootgrp.createVariable("velocities", np.float32, ("u","v","w", "channels"))
+us[:] = dataset.unscale(singan_output)[0,0,:,:,:].cpu().numpy()
+vs[:] = dataset.unscale(singan_output)[0,1,:,:,:].cpu().numpy()
+ws[:] = dataset.unscale(singan_output)[0,2,:,:,:].cpu().numpy()
+
+m = np.linalg.norm(dataset.unscale(singan_output).cpu().numpy()[0],axis=0)
+
+singan_output -= f_hr
+singan_output = torch.pow(singan_output, 2)
+p = 20 * log10((f_hr.max() - f_hr.min()) / singan_output.mean().item()**0.5) 
+e = singan_output.mean()
+print(e)
+print(p)
+
+
 mags[:] = m
+errs[:] = singan_output[0].cpu().numpy().mean(axis=0)
 
 
 
 print("Trilinear upscaling:")
 
 trilin = F.interpolate(f_lr, size=[512, 512, 512], mode='trilinear', align_corners=True)
-e = ((f_hr - trilin)**2).mean()
-p = PSNR(f_hr, trilin, f_hr.max() - f_hr.min())
-print(e)
-print(p)
 
-
-trilin = dataset.unscale(trilin)
-trilin = trilin.detach().cpu().numpy()[0].swapaxes(0,3).swapaxes(0,1).swapaxes(1,2)
-m = np.linalg.norm(trilin,axis=3)
 rootgrp = Dataset("trilinear.nc", "w", format="NETCDF4")
 velocity = rootgrp.createGroup("velocity")
 u = rootgrp.createDimension("u")
 v = rootgrp.createDimension("v")
 w = rootgrp.createDimension("w")
 w = rootgrp.createDimension("channels", 3)
-us = rootgrp.createVariable("u", trilin.dtype, ("u","v","w"))
-vs = rootgrp.createVariable("v", trilin.dtype, ("u","v","w"))
-ws = rootgrp.createVariable("w", trilin.dtype, ("u","v","w"))
-mags = rootgrp.createVariable("magnitude", trilin.dtype, ("u","v","w"))
-velocities = rootgrp.createVariable("velocities", trilin.dtype, ("u","v","w", "channels"))
+us = rootgrp.createVariable("u", np.float32, ("u","v","w"))
+vs = rootgrp.createVariable("v", np.float32, ("u","v","w"))
+ws = rootgrp.createVariable("w", np.float32, ("u","v","w"))
+mags = rootgrp.createVariable("magnitude", np.float32, ("u","v","w"))
+errs = rootgrp.createVariable("error", np.float32, ("u","v","w"))
+velocities = rootgrp.createVariable("velocities", np.float32, ("u","v","w", "channels"))
+us[:] = dataset.unscale(trilin)[0,0,:,:,:].cpu().numpy()
+vs[:] = dataset.unscale(trilin)[0,1,:,:,:].cpu().numpy()
+ws[:] = dataset.unscale(trilin)[0,2,:,:,:].cpu().numpy()
+m = np.linalg.norm(dataset.unscale(trilin).cpu().numpy()[0],axis=0)
+
+trilin -= f_hr
+trilin = torch.pow(trilin, 2)
+p = 20 * log10((f_hr.max() - f_hr.min()) / trilin.mean().item()**0.5) 
+e = trilin.mean()
+print(e)
+print(p)
+
+
 mags[:] = m
+errs[:] = trilin[0].cpu().numpy().mean(axis=0)
