@@ -42,7 +42,7 @@ class Options():
         opt["save_discriminators"]     = True
         opt["physical_constraints"]    = "none"
         opt["patch_size"]              = 128
-        opt["training_patch_size"]     = 64
+        opt["training_patch_size"]     = 96
         opt["regularization"]          = "GP" #Either TV (total variation) or GP (gradient penalty) or SN 
         # GAN training info
         opt["alpha_1"]                 = 0       # Reconstruction loss coefficient
