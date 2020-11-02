@@ -952,7 +952,7 @@ class SinGAN_Generator(nn.Module):
 
         if(self.physical_constraints == "hard" and self.mode == '3D'):
             output = curl3D(output, self.device)
-            return output
+            return output + data
         else:
             return output + data
 
