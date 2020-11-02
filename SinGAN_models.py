@@ -823,7 +823,7 @@ def train_single_scale(generators, discriminators, opt):
         writer.add_scalar('G_loss_scale/%i'%len(generators), G_loss, epoch) 
         writer.add_scalar('L1/%i'%len(generators), rec_loss, epoch)
         writer.add_scalar('Gradient_loss/%i'%len(generators), gradient_loss, epoch)
-        writer.add_scalar('TAD_scale/%i'%len(generators), g, epoch)
+        writer.add_scalar('TAD_scale/%i'%len(generators), phys_loss.item(), epoch)
         writer.add_scalar('Mag_loss_scale/%i'%len(generators), mags.mean(), epoch) 
         writer.add_scalar('Angle_loss_scale/%i'%len(generators), angles.mean(), epoch) 
         discriminator_scheduler.step()
