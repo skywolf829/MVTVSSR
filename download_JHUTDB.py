@@ -1,4 +1,4 @@
-from model import *
+from SinGAN_models import *
 from options import *
 from utility_functions import *
 import torch.nn.functional as F
@@ -131,17 +131,17 @@ sim_name, timestep, field, num_components, num_workers):
 
 frames = []
 
-#name = "channel"
-name = "isotropic1024coarse"
+name = "channel"
+#name = "isotropic1024coarse"
 t0 = time.time()
 count = 0
 endts = 2
 ts_skip = 25
 for i in range(1, endts, ts_skip):
     print("TS %i/%i" % (i, endts))
-    f = get_full_frame_parallel(256, 768, #x
-    256, 768, #y
-    256, 768, #z
+    f = get_full_frame_parallel(0, 512, #x
+    0, 512, #y
+    0, 512, #z
     name, i, 
     "u", 3, 
     64)
@@ -152,7 +152,9 @@ for i in range(1, endts, ts_skip):
     np.save("0.npy", f.astype(np.float32).swapaxes(0,3).swapaxes(3,2).swapaxes(2,1))
     count += 1
     frames.append(f[0])
-
+f = laplace_pyramid_downscale3D(np2torch(f, 
+"cuda").permute(3, 0, 1, 2).unsqueeze(0), 2, 0.5,"cuda")[0].permute(1,2,3,0).cpu().numpy()
+print(f.shape)
 print("finished")
 print(time.time() - t0)
 #lJHTDB.finalize()
