@@ -738,6 +738,7 @@ def train_single_scale(generators, discriminators, opt):
                         phys_loss = opt["alpha_3"] * g 
                         phys_loss.backward(retain_graph=True)
                         gen_err_total += phys_loss.item()
+                        phys_loss = phys_loss.item()
                 if(opt['alpha_4'] > 0.0):
                     cs = torch.nn.CosineSimilarity(dim=1).to(opt['device'])
                     mags = torch.abs(torch.norm(optimal_reconstruction, dim=1) - torch.norm(r, dim=1))
@@ -824,7 +825,7 @@ def train_single_scale(generators, discriminators, opt):
         writer.add_scalar('G_loss_scale/%i'%len(generators), G_loss, epoch) 
         writer.add_scalar('L1/%i'%len(generators), rec_loss, epoch)
         writer.add_scalar('Gradient_loss/%i'%len(generators), gradient_loss, epoch)
-        writer.add_scalar('TAD_scale/%i'%len(generators), phys_loss.item(), epoch)
+        writer.add_scalar('TAD_scale/%i'%len(generators), phys_loss, epoch)
         writer.add_scalar('Mag_loss_scale/%i'%len(generators), mags.mean(), epoch) 
         writer.add_scalar('Angle_loss_scale/%i'%len(generators), angles.mean(), epoch) 
         discriminator_scheduler.step()
