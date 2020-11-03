@@ -703,6 +703,7 @@ def train_single_scale(generators, discriminators, opt):
                 discriminator.zero_grad()
                 G_loss = 0
                 gen_err_total = 0
+                phys_loss = 0
                 loss = nn.L1Loss().to(opt["device"])
                 
                 if(opt["alpha_2"] > 0.0):
