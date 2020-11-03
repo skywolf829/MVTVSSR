@@ -69,8 +69,19 @@ g = TAD3D_CD(a, opt['device'])
 print(a.shape)
 print(g.mean())
 '''
+
+'''
 a = np.load(os.path.join(input_folder, "JHUturbulence", "isotropic128_3D", "0.npy"))
 print(a.shape)
 a = a.swapaxes(0,3).swapaxes(3,2).swapaxes(2,1)
 print(a.shape)
 np.save(os.path.join(input_folder, "JHUturbulence", "isotropic128_3D", "0.npy"), a)
+'''
+
+
+a = torch.randn([1, 3, 100, 100, 100], device="cuda")
+d = TAD3D_CD(a,"cuda").sum()
+print(d)
+a = curl3D(a, "cuda")
+d = TAD3D_CD(a,"cuda").sum()
+print(d)
