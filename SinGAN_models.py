@@ -828,7 +828,9 @@ def train_single_scale(generators, discriminators, opt):
                     gradient_loss_adj.backward(retain_graph=True)
                     gen_err_total += gradient_loss_adj.item()
                 if(opt["alpha_6"] > 0):
-                    path_loss = pathline_loss(r, optimal_reconstruction, 4, 4, 4, 1, 50, opt['device'], periodic=False) * opt['alpha_6']
+                    path_loss = pathline_loss(r, optimal_reconstruction, 
+                    opt['pathline_res'], opt['pathline_res'], opt['pathline_res'], 
+                    1, opt['pathline_length'], opt['device'], periodic=False) * opt['alpha_6']
                     path_loss.backward(retain_graph=True)
                     path_loss = path_loss.item()
                 
