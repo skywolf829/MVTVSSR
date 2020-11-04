@@ -70,10 +70,27 @@ def curl3D(field, device):
     output = torch.cat((dzdy-dydz,dxdz-dzdx,dydx-dxdy), 1)
     return output
 
+def curl3D8(field, device):
+    dzdy = spatial_derivative3D_CD8(field[:,2:3], 1, device)
+    dydz = spatial_derivative3D_CD8(field[:,1:2], 2, device)
+    dxdz = spatial_derivative3D_CD8(field[:,0:1], 2, device)
+    dzdx = spatial_derivative3D_CD8(field[:,2:3], 0, device)
+    dydx = spatial_derivative3D_CD8(field[:,1:2], 0, device)
+    dxdy = spatial_derivative3D_CD8(field[:,0:1], 1, device)
+    output = torch.cat((dzdy-dydz,dxdz-dzdx,dydx-dxdy), 1)
+    return output
+
 def TAD3D_CD(field, device):
     tx = spatial_derivative3D_CD(field[:,0:1,:,:,:], 0, device)
     ty = spatial_derivative3D_CD(field[:,1:2,:,:,:], 1, device)
     tz = spatial_derivative3D_CD(field[:,2:3,:,:,:], 2, device)
+    g = torch.abs(tx + ty + tz)
+    return g
+
+def TAD3D_CD8(field, device):
+    tx = spatial_derivative3D_CD8(field[:,0:1,:,:,:], 0, device)
+    ty = spatial_derivative3D_CD8(field[:,1:2,:,:,:], 1, device)
+    tz = spatial_derivative3D_CD8(field[:,2:3,:,:,:], 2, device)
     g = torch.abs(tx + ty + tz)
     return g
 
@@ -151,6 +168,50 @@ def spatial_derivative3D_CD(field, axis, device):
             [ 0, 0, 0]]])
             .astype(np.float32)).to(device)
     weights = weights.view(1, 1, 3, 3, 3)
+    field = m(field)
+    output = F.conv3d(field, weights)
+    return output
+
+def spatial_derivative3D_CD8(field, axis, device):
+    m = nn.ReplicationPad3d(4)
+    # the first (a) axis in [a, b, c]
+    if(axis == 0):
+        weights = torch.zeros([9, 9, 9], dtype=torch.float32).to(device)
+        weights[0, 4, 4] = 1/280
+        weights[1, 4, 4] = -4/105
+        weights[2, 4, 4] = 1/5
+        weights[3, 4, 4] = -4/5
+        weights[4, 4, 4] = 0
+        weights[5, 4, 4] = 4/5
+        weights[6, 4, 4] = -1/5
+        weights[7, 4, 4] = 4/105
+        weights[8, 4, 4] = -1/280
+        
+    elif(axis == 1):        
+        # the second (b) axis in [a, b, c]
+        weights = torch.zeros([9, 9, 9], dtype=torch.float32).to(device)
+        weights[4, 0, 4] = 1/280
+        weights[4, 1, 4] = -4/105
+        weights[4, 2, 4] = 1/5
+        weights[4, 3, 4] = -4/5
+        weights[4, 4, 4] = 0
+        weights[4, 5, 4] = 4/5
+        weights[4, 6, 4] = -1/5
+        weights[4, 7, 4] = 4/105
+        weights[4, 8, 4] = -1/280
+    elif(axis == 2):
+        # the third (c) axis in [a, b, c]
+        weights = torch.zeros([9, 9, 9], dtype=torch.float32).to(device)
+        weights[4, 4, 1] = 1/280
+        weights[4, 4, 1] = -4/105
+        weights[4, 4, 2] = 1/5
+        weights[4, 4, 3] = -4/5
+        weights[4, 4, 4] = 0
+        weights[4, 4, 5] = 4/5
+        weights[4, 4, 6] = -1/5
+        weights[4, 4, 7] = 4/105
+        weights[4, 4, 8] = -1/280
+    weights = weights.view(1, 1, 9, 9, 9)
     field = m(field)
     output = F.conv3d(field, weights)
     return output

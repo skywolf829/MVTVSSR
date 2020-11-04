@@ -22,7 +22,7 @@ save_folder = os.path.join(MVTVSSR_folder_path, "SavedModels")
 parser = argparse.ArgumentParser(description='Test a trained model')
 
 parser.add_argument('--load_from',default="128_GP_0.5")
-parser.add_argument('--data_folder',default="JHUturbulence/channel3D",type=str,help='File to test on')
+parser.add_argument('--data_folder',default="JHUturbulence/channel512",type=str,help='File to test on')
 parser.add_argument('--device',default="cuda:0",type=str,help='Frames to use from training file')
 
 args = vars(parser.parse_args())
@@ -44,10 +44,19 @@ for i in range(len(discriminators)):
 
 
 dataset = Dataset(os.path.join(input_folder, args["data_folder"]), opt)
-a = dataset.__getitem__(0).cuda()
-#a = laplace_pyramid_downscale3D(a, 1, 0.5,"cuda")
+a = dataset.unscale(dataset.__getitem__(0).cuda())
+#a = laplace_pyramid_downscale3D(a, 2, 0.5,"cuda")
+
+tx = spatial_derivative3D_CD8(a[:,0:1,:,:,:], 0, "cuda")
+ty = spatial_derivative3D_CD8(a[:,1:2,:,:,:], 1, "cuda")
+tz = spatial_derivative3D_CD8(a[:,2:3,:,:,:], 2, "cuda")
+print(a[0,:, 5,5,5])
+print(tx[0,0,5,5,5])
+print(ty[0,0,5,5,5])
+print(tz[0,0,5,5,5])
 print(a.shape)
-d = TAD3D_CD(a,"cuda")
+quit()
+d = TAD3D_CD8(a,"cuda")
 print(d.shape)
 print(d.mean().item())
 from netCDF4 import Dataset
@@ -63,9 +72,8 @@ divergences[:] = d[0,0].cpu().numpy()
 mags[:] = np.linalg.norm(a[0].cpu().numpy(), axis=0)
 
 
-'''
+
 a = torch.randn([1, 3, 128, 128, 128], device="cuda")
-a = curl3D(a, "cuda")
-d = TAD3D_CD(a, "cuda")
+a = curl3D8(a, "cuda")
+d = TAD3D_CD8(a, "cuda")
 print(d.mean().item())
-'''
