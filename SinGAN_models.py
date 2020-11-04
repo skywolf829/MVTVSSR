@@ -757,7 +757,7 @@ def train_single_scale(generators, discriminators, opt):
                         TV_penalty_fake = torch.abs(discrim_error_fake+1)
                         TV_penalty_fake.backward(retain_graph=True)
                     discriminator_optimizer.step()
-
+            torch.autograd.set_detect_anomaly(True)
             # Update generator: maximize D(G(z))
             for j in range(opt["generator_steps"]):
                 generator.zero_grad()
@@ -765,6 +765,7 @@ def train_single_scale(generators, discriminators, opt):
                 G_loss = 0
                 gen_err_total = 0
                 phys_loss = 0
+                path_loss = 0
                 loss = nn.L1Loss().to(opt["device"])
                 
                 if(opt["alpha_2"] > 0.0):
@@ -826,6 +827,10 @@ def train_single_scale(generators, discriminators, opt):
                     gradient_loss_adj = gradient_loss * opt['alpha_5']
                     gradient_loss_adj.backward(retain_graph=True)
                     gen_err_total += gradient_loss_adj.item()
+                if(opt["alpha_6"] > 0):
+                    path_loss = pathline_loss(r, optimal_reconstruction, 1, 1, 1, 1, 1, opt['device'], periodic=False) * opt['alpha_6']
+                    path_loss.backward(retain_graph=True)
+                    path_loss = path_loss.item()
                 
                 generator_optimizer.step()
             
@@ -886,7 +891,8 @@ def train_single_scale(generators, discriminators, opt):
         writer.add_scalar('G_loss_scale/%i'%len(generators), G_loss, epoch) 
         writer.add_scalar('L1/%i'%len(generators), rec_loss, epoch)
         writer.add_scalar('Gradient_loss/%i'%len(generators), gradient_loss, epoch)
-        writer.add_scalar('TAD_scale/%i'%len(generators), phys_loss, epoch)
+        writer.add_scalar('TAD/%i'%len(generators), phys_loss, epoch)
+        writer.add_scalar('path_loss/%i'%len(generators), path_loss, epoch)
         writer.add_scalar('Mag_loss_scale/%i'%len(generators), mags.mean(), epoch) 
         writer.add_scalar('Angle_loss_scale/%i'%len(generators), angles.mean(), epoch) 
         discriminator_scheduler.step()

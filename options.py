@@ -6,7 +6,7 @@ class Options():
         opt = {}
         # Input info
         opt["mode"]                    = "3D"      # What SinGAN to use - 2D or 3D
-        opt["data_folder"]             = "JHUturbulence/channel"
+        opt["data_folder"]             = "JHUturbulence/isotropic128_3D"
         #opt["data_folder"]             = "TestImage"
         opt["image_normalize"]         = False
         opt["scale_data"]              = False
@@ -50,6 +50,7 @@ class Options():
         opt["alpha_3"]                 = 0        # Soft physical loss coefficient
         opt["alpha_4"]                 = 100       # mag_and_angle loss
         opt["alpha_5"]                 = 1          # first derivative loss coeff
+        opt["alpha_6"]                 = 1  # Lagrangian transport loss
         opt["generator_steps"]         = 3
         opt["discriminator_steps"]     = 3
         opt["epochs"]                  = 2000

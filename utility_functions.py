@@ -61,24 +61,24 @@ def trilinear_interpolate(im, x, y, z):
     z0 = torch.floor(z).type(dtype_long)
     z1 = z0 + 1
 
-    x0 = torch.clamp(x0, 0, im.shape[4]-1).type(dtype)
-    x1 = torch.clamp(x1, 0, im.shape[4]-1).type(dtype)
+    x0 = torch.clamp(x0, 0, im.shape[2]-1).type(dtype_long)
+    x1 = torch.clamp(x1, 0, im.shape[2]-1).type(dtype_long)
 
-    y0 = torch.clamp(y0, 0, im.shape[3]-1).type(dtype)
-    y1 = torch.clamp(y1, 0, im.shape[3]-1).type(dtype)
+    y0 = torch.clamp(y0, 0, im.shape[3]-1).type(dtype_long)
+    y1 = torch.clamp(y1, 0, im.shape[3]-1).type(dtype_long)
 
-    z0 = torch.clamp(z0, 0, im.shape[2]-1).type(dtype)
-    z1 = torch.clamp(z1, 0, im.shape[2]-1).type(dtype)
+    z0 = torch.clamp(z0, 0, im.shape[4]-1).type(dtype_long)
+    z1 = torch.clamp(z1, 0, im.shape[4]-1).type(dtype_long)
     
-    c00 = im[0,:,x0,y0,z0] * (x1-x) + im[0,:,x1,y0,z0]*(x-x0)
-    c01 = im[0,:,x0,y0,z1] * (x1-x) + im[0,:,x1,y0,z1]*(x-x0)
-    c10 = im[0,:,x0,y1,z0] * (x1-x) + im[0,:,x1,y1,z0]*(x-x0)
-    c11 = im[0,:,x0,y1,z1] * (x1-x) + im[0,:,x1,y1,z1]*(x-x0)
+    c00 = im[0,:,x0,y0,z0] * (x1.type(dtype)-x) + im[0,:,x1,y0,z0]*(x-x0.type(dtype))
+    c01 = im[0,:,x0,y0,z1] * (x1.type(dtype)-x) + im[0,:,x1,y0,z1]*(x-x0.type(dtype))
+    c10 = im[0,:,x0,y1,z0] * (x1.type(dtype)-x) + im[0,:,x1,y1,z0]*(x-x0.type(dtype))
+    c11 = im[0,:,x0,y1,z1] * (x1.type(dtype)-x) + im[0,:,x1,y1,z1]*(x-x0.type(dtype))
 
-    c0 = c00 * (y1-y) + c10 * (y-y0)
-    c1 = c01 * (y1-y) + c11 * (y-y0)
+    c0 = c00 * (y1.type(dtype)-y) + c10 * (y-y0.type(dtype))
+    c1 = c01 * (y1.type(dtype)-y) + c11 * (y-y0.type(dtype))
 
-    c = c0 * (z1-z) + c1 * (z-z0)
+    c = c0 * (z1.type(dtype)-z) + c1 * (z-z0.type(dtype))
     return c
     
 def lagrangian_transport(VF, x_res, y_res, time_length, ts_per_sec, device):
@@ -108,18 +108,18 @@ def lagrangian_transport(VF, x_res, y_res, time_length, ts_per_sec, device):
     return particles_over_time
 
 def lagrangian_transport3D(VF, x_res, y_res, z_res, 
-time_length, ts_per_sec, device):
+time_length, ts_per_sec, device, periodic=False):
     #x = torch.arange(-1, 1, int(VF.shape[2] / x_res), dtype=torch.float32).unsqueeze(1).expand([int(VF.shape[2] / x_res), int(VF.shape[3] / y_res)]).unsqueeze(0)
 
-    x = torch.arange(0, VF.shape[2], int(VF.shape[2] / x_res), 
+    x = torch.arange(0, VF.shape[2], VF.shape[2] / x_res, 
     dtype=torch.float32).view(-1, 1, 1).repeat([1, y_res, z_res])
     x = x.view(1,x_res,y_res, z_res)
-    y = torch.arange(0, VF.shape[3], int(VF.shape[3] / y_res), 
+    y = torch.arange(0, VF.shape[3], VF.shape[3] / y_res, 
     dtype=torch.float32).view(1, -1, 1).repeat([x_res, 1, z_res])
     y = y.view(1,x_res,y_res, z_res)
-    z = torch.arange(0, VF.shape[4], int(VF.shape[4] / z_res), 
+    z = torch.arange(0, VF.shape[4], VF.shape[4] / z_res, 
     dtype=torch.float32).view(1, 1, -1).repeat([x_res, y_res, 1])
-    z = y.view(1,x_res,y_res, z_res)
+    z = z.view(1,x_res,y_res, z_res)
 
     particles = torch.cat([x, y, z],axis=0)
     particles = torch.reshape(particles, [3, -1]).transpose(0,1)
@@ -131,8 +131,11 @@ time_length, ts_per_sec, device):
         start_t = time.time()
         flow = trilinear_interpolate(VF, particles[:,0], particles[:,1], particles[:,2])
         particles[:] += flow[:, :].permute(1,0) * (1 / ts_per_sec)
-        particles[:] += torch.tensor(list(VF.shape[2:])).to(device)
-        particles[:] %= torch.tensor(list(VF.shape[2:])).to(device)
+        if(periodic):
+            particles[:] += torch.tensor(list(VF.shape[2:])).to(device)
+            particles[:] %= torch.tensor(list(VF.shape[2:])).to(device)
+        else:
+            particles[:] = torch.clamp(particles, 0, VF.shape[2])
     particles_over_time.append(particles)
     
     return particles_over_time
@@ -150,10 +153,53 @@ def viz_pathlines(frame, pathlines, name, color):
     return arrs
 
 def pathline_distance(pl1, pl2):
-    d = 0
-    for i in range(len(pl1)):
+    d = torch.norm(pl1[0] - pl2[0], dim=1).sum()
+    for i in range(1, len(pl1)):
         d += torch.norm(pl1[i] - pl2[i], dim=1).sum()
     return d
+
+def pathline_loss(real_VF, rec_VF, x_res, y_res, z_res, ts_per_sec, time_length, device, periodic=False):
+    x = torch.arange(0, real_VF.shape[2], real_VF.shape[2] / x_res, 
+    dtype=torch.float32).view(-1, 1, 1).repeat([1, y_res, z_res])
+    x = x.view(1,x_res,y_res, z_res)
+    y = torch.arange(0, real_VF.shape[3], real_VF.shape[3] / y_res, 
+    dtype=torch.float32).view(1, -1, 1).repeat([x_res, 1, z_res])
+    y = y.view(1,x_res,y_res, z_res)
+    z = torch.arange(0, real_VF.shape[4], real_VF.shape[4] / z_res, 
+    dtype=torch.float32).view(1, 1, -1).repeat([x_res, y_res, 1])
+    z = z.view(1,x_res,y_res, z_res)
+    
+    particles_real = torch.cat([x, y, z],axis=0)
+    particles_real = torch.reshape(particles_real, [3, -1]).transpose(0,1)
+    particles_real = particles_real.to(device)
+
+    particles_rec = torch.cat([x, y, z],axis=0)
+    particles_rec = torch.reshape(particles_rec, [3, -1]).transpose(0,1)
+    particles_rec = particles_rec.to(device)
+    
+    transport_loss = torch.autograd.Variable(torch.tensor(0.0).to(device))
+    for i in range(0, time_length * ts_per_sec):        
+        flow_real = trilinear_interpolate(real_VF, 
+        particles_real[:,0], particles_real[:,1], particles_real[:,2])
+
+        flow_rec = trilinear_interpolate(rec_VF, 
+        particles_rec[:,0], particles_rec[:,1], particles_rec[:,2])
+
+        particles_real[:] = particles_real[:] + flow_real[:, :].permute(1,0) * (1 / ts_per_sec)
+        particles_rec[:]  = particles_rec[:] +  flow_rec[:, :].permute(1,0) * (1 / ts_per_sec)
+
+        if(periodic):
+            particles_real[:] += torch.tensor(list(real_VF.shape[2:])).to(device)
+            particles_real[:] %= torch.tensor(list(real_VF.shape[2:])).to(device)
+            particles_rec[:] += torch.tensor(list(rec_VF.shape[2:])).to(device)
+            particles_rec[:] %= torch.tensor(list(rec_VF.shape[2:])).to(device)
+        else:
+            with torch.no_grad():
+                particles_real[:] = torch.clamp(particles_real, 0, real_VF.shape[2])
+                particles_rec[:] = torch.clamp(particles_rec, 0, rec_VF.shape[2])
+            transport_loss += torch.norm(particles_real -particles_rec, dim=1).mean()
+    return transport_loss / (time_length * ts_per_sec)
+    
 
 def toImg(vectorField, renorm_channels = False):
     vf = vectorField.copy()
