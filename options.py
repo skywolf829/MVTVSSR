@@ -14,7 +14,7 @@ class Options():
         opt["save_folder"]             = "SavedModels"
         opt["save_name"]               = "Temp"    # Folder that the model will be saved to
         opt["num_channels"]            = 3
-        opt["spatial_downscale_ratio"] = 0.75       # Spatial downscale ratio between levels
+        opt["spatial_downscale_ratio"] = 0.5       # Spatial downscale ratio between levels
         opt["min_dimension_size"]      = 25        # Smallest a dimension can go as the smallest level
         opt["train_date_time"]         = None      # The day/time the model was trained (finish time)
         
