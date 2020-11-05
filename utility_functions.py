@@ -158,7 +158,7 @@ def pathline_distance(pl1, pl2):
         d += torch.norm(pl1[i] - pl2[i], dim=1).sum()
     return d
 
-def pathline_loss(real_VF, rec_VF, x_res, y_res, z_res, ts_per_sec, time_length, device, periodic=False):
+def pathline_loss3D(real_VF, rec_VF, x_res, y_res, z_res, ts_per_sec, time_length, device, periodic=False):
     x = torch.arange(0, real_VF.shape[2], real_VF.shape[2] / x_res, 
     dtype=torch.float32).view(-1, 1, 1).repeat([1, y_res, z_res])
     x = x.view(1,x_res,y_res, z_res)
@@ -206,6 +206,49 @@ def pathline_loss(real_VF, rec_VF, x_res, y_res, z_res, ts_per_sec, time_length,
             transport_loss += torch.norm(particles_real[indices] -particles_rec[indices], dim=1).mean()
     return transport_loss / (time_length * ts_per_sec)
     
+def pathline_loss2D(real_VF, rec_VF, x_res, y_res, ts_per_sec, time_length, device, periodic=False):
+    x = torch.arange(0, real_VF.shape[2], real_VF.shape[2] / x_res, 
+    dtype=torch.float32).view(-1, 1).repeat([1, y_res])
+    x = x.view(1,x_res,y_res)
+    y = torch.arange(0, real_VF.shape[3], real_VF.shape[3] / y_res, 
+    dtype=torch.float32).view(1, -1).repeat([x_res, 1])
+    y = y.view(1,x_res,y_res)
+    
+    particles_real = torch.cat([x, y],axis=0)
+    particles_real = torch.reshape(particles_real, [2, -1]).transpose(0,1)
+    particles_real = particles_real.to(device)
+
+    particles_rec = torch.cat([x, y],axis=0)
+    particles_rec = torch.reshape(particles_rec, [2, -1]).transpose(0,1)
+    particles_rec = particles_rec.to(device)
+    
+    transport_loss = torch.autograd.Variable(torch.tensor(0.0).to(device))
+    for i in range(0, time_length * ts_per_sec):
+        indices = (particles_real[:,0] > 0.0) & (particles_real[:,1] > 0.0) & \
+        (particles_rec[:,0] > 0.0) & (particles_rec[:,1] > 0.0) & \
+        (particles_real[:,0] < real_VF.shape[2]) & (particles_real[:,1] < real_VF.shape[3]) & \
+        (particles_rec[:,0] < rec_VF.shape[2]) & (particles_rec[:,1] < rec_VF.shape[3]) 
+        
+        flow_real = bilinear_interpolate(real_VF, 
+        particles_real[indices,0], particles_real[indices,1])
+
+        flow_rec = bilinear_interpolate(rec_VF, 
+        particles_rec[indices,0], particles_rec[indices,1])
+
+        particles_real[indices] += flow_real.permute(1,0) * (1 / ts_per_sec)
+        particles_rec[indices] += flow_rec.permute(1,0) * (1 / ts_per_sec)
+        print(indices.sum())
+        if(periodic):
+            particles_real[:] += torch.tensor(list(real_VF.shape[2:])).to(device)
+            particles_real[:] %= torch.tensor(list(real_VF.shape[2:])).to(device)
+            particles_rec[:] += torch.tensor(list(rec_VF.shape[2:])).to(device)
+            particles_rec[:] %= torch.tensor(list(rec_VF.shape[2:])).to(device)
+        else:
+            #with torch.no_grad():
+            #    particles_real = torch.clamp(particles_real, 0, real_VF.shape[2])
+            #    particles_rec = torch.clamp(particles_rec, 0, rec_VF.shape[2])
+            transport_loss += torch.norm(particles_real[indices] -particles_rec[indices], dim=1).mean()
+    return transport_loss / (time_length * ts_per_sec)
 
 def toImg(vectorField, renorm_channels = False):
     vf = vectorField.copy()

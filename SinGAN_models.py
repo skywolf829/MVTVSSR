@@ -60,6 +60,12 @@ def TAD3D(field, device):
     g = torch.abs(tx + ty + tz)
     return g
 
+def curl2D(field, device):
+    dydx = spatial_derivative2D(field[:,1:2], 0, device)
+    dxdy = spatial_derivative2D(field[:,0:1], 1, device)
+    output = dydx-dxdy
+    return output
+
 def curl3D(field, device):
     dzdy = spatial_derivative3D_CD(field[:,2:3], 1, device)
     dydz = spatial_derivative3D_CD(field[:,1:2], 2, device)
@@ -94,7 +100,7 @@ def TAD3D_CD8(field, device):
     g = torch.abs(tx + ty + tz)
     return g
 
-def spatial_derivative2D(field, axis, device):
+def spatial_derivative2D_sobel(field, axis, device):
     m = nn.ReplicationPad2d(1)
     if(axis == 0):
         weights = torch.tensor(
@@ -113,6 +119,32 @@ def spatial_derivative2D(field, axis, device):
             [-1/8, -1/4, -1/8], 
             [   0,    0,    0], 
             [ 1/8,  1/4,  1/8]
+            ]
+        ).astype(np.float32)).to(device)
+        weights = weights.view(1, 1, 3, 3)
+        field = m(field)
+        output = F.conv2d(field, weights)
+    return output
+
+def spatial_derivative2D(field, axis, device):
+    m = nn.ReplicationPad2d(1)
+    if(axis == 0):
+        weights = torch.tensor(
+            np.array([
+            [0, 0, 0], 
+            [-0.5, 0, 0.5],
+            [0, 0, 0]
+            ]
+        ).astype(np.float32)).to(device)
+        weights = weights.view(1, 1, 3, 3)
+        field = m(field)
+        output = F.conv2d(field, weights)
+    elif(axis == 1):
+        weights = torch.tensor(
+            np.array([
+            [0, -0.5, 0], 
+            [0,  0,   0], 
+            [0, 0.5,  0]
             ]
         ).astype(np.float32)).to(device)
         weights = weights.view(1, 1, 3, 3)
@@ -685,7 +717,8 @@ def train_single_scale(generators, discriminators, opt):
             optimal_LR = torch.zeros(generator.get_input_shape(), device=opt["device"])
 
     if(curr_size > max_dim):
-        starts_all, ends_all = dataset.get_patch_ranges(real, opt["training_patch_size"], generator.receptive_field())
+        starts_all, ends_all = dataset.get_patch_ranges(real, opt["training_patch_size"], 
+        generator.receptive_field(), opt['mode'])
     else:
         starts_all = [list(np.array(real.shape[2:]) * 0)]
         ends_all = [list(np.array(real.shape[2:]))]
@@ -828,9 +861,14 @@ def train_single_scale(generators, discriminators, opt):
                     gradient_loss_adj.backward(retain_graph=True)
                     gen_err_total += gradient_loss_adj.item()
                 if(opt["alpha_6"] > 0):
-                    path_loss = pathline_loss(r, optimal_reconstruction, 
-                    opt['pathline_res'], opt['pathline_res'], opt['pathline_res'], 
-                    1, opt['pathline_length'], opt['device'], periodic=False) * opt['alpha_6']
+                    if(opt['mode'] == '3D'):
+                        path_loss = pathline_loss3D(r, optimal_reconstruction, 
+                        opt['pathline_res'], opt['pathline_res'], opt['pathline_res'], 
+                        1, opt['pathline_length'], opt['device'], periodic=False) * opt['alpha_6']
+                    elif(opt['mode'] == '2D'):
+                        path_loss = pathline_loss2D(r, optimal_reconstruction, 
+                        opt['pathline_res'], opt['pathline_res'], 
+                        1, opt['pathline_length'], opt['device'], periodic=False) * opt['alpha_6']
                     path_loss.backward(retain_graph=True)
                     path_loss = path_loss.item()
                 
@@ -1024,6 +1062,12 @@ class SinGAN_Generator(nn.Module):
         if(self.physical_constraints == "hard" and self.mode == '3D'):
             output = curl3D(output, self.device)
             return output
+        elif(self.physical_constraints == "hard" and self.mode == '2D'):
+            output = curl2D(output, self.device)
+            gradx = spatial_derivative2D(output[:,0:1], 0, self.device)
+            grady = spatial_derivative2D(output[:,1:2], 1, self.device)
+            output = torch.cat([-grady, gradx], axis=1)
+            return output
         else:
             return output + data
 
@@ -1202,24 +1246,36 @@ class Dataset(torch.utils.data.Dataset):
             d *= self.max_mag
         return d
 
-    def get_patch_ranges(self, frame, patch_size, receptive_field):
+    def get_patch_ranges(self, frame, patch_size, receptive_field, mode):
         starts = []
         rf = receptive_field
         ends = []
-        for z in range(0,max(1,frame.shape[2]-patch_size+1), patch_size-2*rf):
-            z = min(z, max(0, frame.shape[2] - patch_size))
-            z_stop = min(frame.shape[2], z + patch_size)
-            
-            for y in range(0, max(1,frame.shape[3]-patch_size+1), patch_size-2*rf):
-                y = min(y, max(0, frame.shape[3] - patch_size))
-                y_stop = min(frame.shape[3], y + patch_size)
+        if(mode == "3D"):
+            for z in range(0,max(1,frame.shape[2]-patch_size+1), patch_size-2*rf):
+                z = min(z, max(0, frame.shape[2] - patch_size))
+                z_stop = min(frame.shape[2], z + patch_size)
+                
+                for y in range(0, max(1,frame.shape[3]-patch_size+1), patch_size-2*rf):
+                    y = min(y, max(0, frame.shape[3] - patch_size))
+                    y_stop = min(frame.shape[3], y + patch_size)
 
-                for x in range(0, max(1,frame.shape[4]-patch_size+1), patch_size-2*rf):
-                    x = min(x, max(0, frame.shape[4] - patch_size))
-                    x_stop = min(frame.shape[4], x + patch_size)
+                    for x in range(0, max(1,frame.shape[4]-patch_size+1), patch_size-2*rf):
+                        x = min(x, max(0, frame.shape[4] - patch_size))
+                        x_stop = min(frame.shape[4], x + patch_size)
 
-                    starts.append([z, y, x])
-                    ends.append([z_stop, y_stop, x_stop])
+                        starts.append([z, y, x])
+                        ends.append([z_stop, y_stop, x_stop])
+        elif(mode == "2D"):
+            for y in range(0, max(1,frame.shape[2]-patch_size+1), patch_size-2*rf):
+                y = min(y, max(0, frame.shape[2] - patch_size))
+                y_stop = min(frame.shape[2], y + patch_size)
+
+                for x in range(0, max(1,frame.shape[3]-patch_size+1), patch_size-2*rf):
+                    x = min(x, max(0, frame.shape[3] - patch_size))
+                    x_stop = min(frame.shape[3], x + patch_size)
+
+                    starts.append([y, x])
+                    ends.append([y_stop, x_stop])
         return starts, ends
 
     def __getitem__(self, index):
