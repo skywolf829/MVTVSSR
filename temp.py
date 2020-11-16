@@ -28,3 +28,5 @@ c= laplace_pyramid_downscale3D(a[:,1:2], 2, 0.5, "cuda:1")
 d= laplace_pyramid_downscale3D(a[:,2:3], 2, 0.5, "cuda:1")
 e = torch.cat([b,c,d], axis=1)
 print(e.shape)
+e = e.cpu().numpy()[0]
+np.save("0.npy", e)
