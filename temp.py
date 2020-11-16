@@ -22,5 +22,6 @@ save_folder = os.path.join(MVTVSSR_folder_path, "SavedModels")
 
 a = np.load("0.npy")
 a = np2torch(a, "cuda:1").unsqueeze(0)
-a = laplace_pyramid_downscale3D(a, 2, 0.5, "cuda:1")
+with torch.no_grad():   
+    a = laplace_pyramid_downscale3D(a, 2, 0.5, "cuda:1")
 print(a.shape)
