@@ -42,15 +42,6 @@ for i in range(len(discriminators)):
     discriminators[i].to(args["device"])
     discriminators[i].eval()
 
-
-def get_sphere(v, radius, shell_size):
-    xxx = torch.arange(0, v.shape[0], dtype=v.dtype, device=v.device).view(-1, 1,1).repeat(1, v.shape[1], v.shape[2])
-    yyy = torch.arange(0, v.shape[1], dtype=v.dtype, device=v.device).view(1, -1,1).repeat(v.shape[0], 1, v.shape[2])
-    zzz = torch.arange(0, v.shape[2], dtype=v.dtype, device=v.device).view(1, 1,-1).repeat(v.shape[0], v.shape[1], 1)
-    sphere = (((xxx-int(v.shape[0]/2))**2) + ((yyy-int(v.shape[1]/2))**2) + ((zzz-int(v.shape[2]/2))**2))**0.5
-    sphere = torch.logical_and(sphere < (radius + int(shell_size/2)), sphere > (radius - int(shell_size/2)))
-    return sphere
-
 def get_ks(x, y, z, xmax, ymax, zmax, device):
     xxx = torch.arange(x,device=device).type(torch.cuda.FloatTensor).view(-1, 1,1).repeat(1, y, z)
     yyy = torch.arange(y,device=device).type(torch.cuda.FloatTensor).view(1, -1,1).repeat(x, 1, z)
@@ -65,6 +56,43 @@ def get_ks(x, y, z, xmax, ymax, zmax, device):
 def movingaverage(interval, window_size):
     window= ones(int(window_size))/float(window_size)
     return convolve(interval, window, 'same')
+
+def generate_patchwise(generator, LR, mode):
+    #print("Gen " + str(i))
+    patch_size = 64
+    rf = int(generator.receptive_field() / 2)
+    generated_image = torch.zeros(LR.shape).to(opt['device'])
+    for z in range(0,generated_image.shape[2], patch_size-2*rf):
+        z = min(z, max(0, generated_image.shape[2] - patch_size))
+        z_stop = min(generated_image.shape[2], z + patch_size)
+        for y in range(0,generated_image.shape[3], patch_size-2*rf):
+            y = min(y, max(0, generated_image.shape[3] - patch_size))
+            y_stop = min(generated_image.shape[3], y + patch_size)
+
+            for x in range(0,generated_image.shape[4], patch_size-2*rf):
+                x = min(x, max(0, generated_image.shape[4] - patch_size))
+                x_stop = min(generated_image.shape[4], x + patch_size)
+
+                if(mode == "reconstruct"):
+                    #noise = generator.optimal_noise[:,:,z:z_stop,y:y_stop,x:x_stop]
+                    noise = torch.zeros([1, 3,z_stop-z,y_stop-y,x_stop-x], device="cuda")
+                elif(mode == "random"):
+                    noise = torch.randn([generated_image.shape[0], generated_image.shape[1],
+                    z_stop-z,y_stop-y,x_stop-x], device=opt['device'])
+                
+                #print("[%i:%i, %i:%i, %i:%i]" % (z, z_stop, y, y_stop, x, x_stop))
+                result = generator(LR[:,:,z:z_stop,y:y_stop,x:x_stop], 
+                noise)
+
+                x_offset = rf if x > 0 else 0
+                y_offset = rf if y > 0 else 0
+                z_offset = rf if z > 0 else 0
+
+                generated_image[:,:,
+                z+z_offset:z+noise.shape[2],
+                y+y_offset:y+noise.shape[3],
+                x+x_offset:x+noise.shape[4]] = result[:,:,z_offset:,y_offset:,x_offset:]
+    return generated_image
 
 def compute_tke_spectrum(u,v,w,lx,ly,lz,smooth):
     """
@@ -158,8 +186,8 @@ def compute_tke_spectrum(u,v,w,lx,ly,lz,smooth):
 
     return knyquist, wave_numbers, tke_spectrum
 
-dataset = Dataset(os.path.join(input_folder, args["data_folder"]), opt)
-dataset2 = Dataset(os.path.join(input_folder, args["data_folder_diffsize"]), opt)
+dataset2 = Dataset(os.path.join(input_folder, args["data_folder"]), opt)
+dataset = Dataset(os.path.join(input_folder, args["data_folder_diffsize"]), opt)
 
 f = dataset[0].cuda()
 
@@ -187,34 +215,28 @@ f_lr = laplace_pyramid_downscale3D(f, opt['n']-gen_to_use-1,
 opt['spatial_downscale_ratio'],
 opt['device'])
 
-f_trilin = dataset.unscale(F.interpolate(f_lr, mode='trilinear', size=[128, 128, 128])).cpu()[0].numpy()
+f_trilin = dataset.unscale(F.interpolate(f_lr, mode='trilinear', size=[512, 512, 512])).cpu()[0].numpy()
 b, c, d = compute_tke_spectrum(f_trilin[0], f_trilin[1], f_trilin[2], 
 2 * pi * (f_trilin.shape[1] / 1024.0), 2 * pi * (f_trilin.shape[2] / 1024), 
 2 * pi * (f_trilin.shape[3] / 1024.0), True)
 
 plt.plot(c[c < b], d[c < b], color='blue')
 
-
-singan_output = generate_by_patch(generators[0:2], 
-"reconstruct", opt, 
-opt['device'], opt['patch_size'], 
-generated_image=f_lr, start_scale=1)
-#print(str(i)+": " + str(singan_output.shape))
-singan_output = F.interpolate(singan_output, mode='trilinear', size=[128, 128, 128])
-singan_output = dataset.unscale(singan_output).cpu().numpy()[0]
+with torch.no_grad():
+    singan_output = f_lr.clone()
+    singan_output = F.interpolate(singan_output, size=[256, 256, 256], mode='trilinear', align_corners=True)
+    singan_output = generate_patchwise(generators[1], singan_output,
+    "reconstruct")
 
 b, c, d = compute_tke_spectrum(singan_output[0], singan_output[1], singan_output[2], 
 2 * pi * (singan_output.shape[1] / 1024.0), 2 * pi * (singan_output.shape[2] / 1024), 
 2 * pi * (singan_output.shape[3] / 1024.0), True)
 
 plt.plot(c[c < b], d[c < b], color='green')
-
-singan_output = generate_by_patch(generators[:], 
-"reconstruct", opt, 
-opt['device'], opt['patch_size'], 
-generated_image=f_lr, start_scale=1)
-singan_output = dataset.unscale(singan_output.cpu()).cpu().numpy()[0]
-
+with torch.no_grad():
+    singan_output = F.interpolate(singan_output, size=[512, 512, 512], mode='trilinear', align_corners=True)
+    singan_output = generate_patchwise(generators[2], singan_output,
+    "reconstruct")
 b, c, d = compute_tke_spectrum(singan_output[0], singan_output[1], singan_output[2], 
 2 * pi * (singan_output.shape[1] / 1024.0), 2 * pi * (singan_output.shape[2] / 1024), 
 2 * pi * (singan_output.shape[3] / 1024.0), True)
@@ -228,89 +250,3 @@ plt.title("Energy Spectra")
 plt.legend(["1.6*epsilon^(2/3)*k^(-5/3)", "Ground truth data", "Trilinear", 
 "SinGAN - intermediate", "SinGAN - final"])
 plt.show()
-
-'''
-f_lr = laplace_pyramid_downscale3D(f, opt['n']-gen_to_use-1,
-opt['spatial_downscale_ratio'],
-opt['device'])
-print(f_lr.shape)
-f_singan_fft = []
-labels = []
-for i in range(len(generators)-1):
-    singan_output = generate_by_patch(generators[0:i+2], 
-    "reconstruct", opt, 
-    opt['device'], opt['patch_size'], 
-    generated_image=f_lr, start_scale=1)
-    #print(str(i)+": " + str(singan_output.shape))
-    singan_output = F.interpolate(singan_output, mode='trilinear', size=[128, 128, 128])
-    singan_output = singan_output.cpu().numpy()[0]
-    singan_output = np.linalg.norm(singan_output, axis=0)
-    f_singan_fft.append(np2torch(np.log(np.abs(np.fft.fftshift(np.fft.fftn(singan_output)))**2), "cuda:0"))
-    labels.append("SinGAN - after gen " + str(i+1))
-
-f_trilin = F.interpolate(f_lr, mode='trilinear', size=[128, 128, 128])
-f_trilin = f_trilin.cpu().numpy()[0]
-print(f_trilin.shape)
-labels.append("Trilinear")
-f = np.linalg.norm(f[0].cpu().numpy(), axis=0)
-f_trilin = np.linalg.norm(f_trilin, axis=0)
-f_fft = np.fft.fftn(f)
-f_trilin_fft = np.fft.fftn(f_trilin)
-labels.append("Ground truth")
-
-'''
-'''
-f_fft = np.log(np.abs(np.fft.fftshift(f_fft))**2)
-plt.imshow(f_fft[256])
-plt.show()
-'''
-'''
-f_fft = np2torch(np.log(np.abs(np.fft.fftshift(f_fft))**2), "cuda:0")
-f_trilin_fft = np2torch(np.log(np.abs(np.fft.fftshift(f_trilin_fft))**2), "cuda:0")
-
-num_bins = int(f_fft.shape[0] / 2)
-#num_bins = 2
-bins = []
-trilin_bins = []
-singan_bins = []
-for j in range(len(f_singan_fft)):
-    singan_bins.append([])
-gif = []
-#imageio.imsave("f_fft.png", f_fft[256].cpu().numpy())
-for i in range(0, num_bins):
-    radius = i * (f_fft.shape[0] / num_bins)
-    shell = 5    
-    sphere = get_sphere(f_fft, radius, shell)
-    s = f_fft * sphere
-    gif.append(s[64].cpu().numpy())
-    s_trilin = f_trilin_fft * sphere
-    on_pixels = sphere.sum().item()
-    bins.append(s.sum().item() / (on_pixels+1))
-    trilin_bins.append(s_trilin.sum().item() / (on_pixels+1))
-    for j in range(len(f_singan_fft)):
-        s_singan = f_singan_fft[j] * sphere
-        singan_bins[j].append(s_singan.sum().item() / (on_pixels+1))
-
-#imageio.mimwrite("spheres.gif", gif)
-ks = []
-dis=0.0928
-for i in range(num_bins):
-    if(i == 0):
-        ks.append(1.6 * (dis**(2.0/3.0)))
-    else:
-        ks.append(1.6 * (dis**(2.0/3.0)) * ((i) **(-5.0/3.0)))
-        
-for j in range(len(f_singan_fft)):
-    plt.plot(np.arange(0, num_bins), singan_bins[j])
-plt.plot(np.arange(0, num_bins), trilin_bins)
-plt.plot(np.arange(0, num_bins), bins)
-#plt.plot(np.arange(0, num_bins), ks, linestyle="dashed", color="black")
-
-plt.yscale("log")
-plt.xscale("log")
-plt.xlabel("wavenumber")
-plt.ylabel("average FFT coeff")
-plt.title("FFT coefficients at different wavenumbers for 128^3 volume")
-plt.legend(labels)# '1.6*e^(2/3)*k^(-5/3)'])
-plt.show()
-'''
