@@ -351,6 +351,7 @@ def laplace_pyramid_downscale3D(frame, level, downscale_per_level, device):
     print(gaussian_kernel.shape)
     with torch.no_grad():
         for i in range(level):
+            print(i)
             s = (input_size * (downscale_per_level**(i+1))).astype(int)
             frame = F.conv3d(frame, gaussian_kernel, groups=frame.shape[1])
             frame = F.interpolate(frame, size = list(s), mode='nearest')
