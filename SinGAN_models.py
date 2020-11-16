@@ -342,7 +342,8 @@ def laplace_pyramid_downscale3D(frame, level, downscale_per_level, device):
     gaussian_kernel = gaussian_kernel / torch.sum(gaussian_kernel)
 
     # Reshape to 2d depthwise convolutional weight
-    gaussian_kernel = gaussian_kernel.view(1, 1, kernel_size, kernel_size, kernel_size).to(device)
+    gaussian_kernel = gaussian_kernel.view(1, 1, kernel_size, 
+    kernel_size, kernel_size).to(device)
     gaussian_kernel = gaussian_kernel.repeat(frame.shape[1], 1, 1, 1, 1)
     input_size = np.array(list(frame.shape[2:]))
     with torch.no_grad():
