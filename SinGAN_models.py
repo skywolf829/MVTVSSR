@@ -377,7 +377,7 @@ def laplace_pyramid_downscale3D(frame, level, downscale_per_level, device, perio
         for i in range(level):
             s = (input_size * (downscale_per_level**(i+1))).astype(int)
             if(periodic):
-                frame = reflection_pad3D(frame, int(kernel_size / 2))
+                frame = reflection_pad3D(frame, int(kernel_size / 2), device)
             frame = F.conv3d(frame, gaussian_kernel, groups=frame.shape[1])
             frame = F.interpolate(frame, size = list(s), mode='nearest')
     del gaussian_kernel
