@@ -20,10 +20,12 @@ output_folder = os.path.join(MVTVSSR_folder_path, "Output")
 save_folder = os.path.join(MVTVSSR_folder_path, "SavedModels")
 
 
-a = np.load("D:\\GitHub\\MVTVSSR\\InputData\\JHUturbulence\\isotropic128_full\\0.npy")
+a = np.load("0.npy")
+a = a[:,::8,::8,::8]
+np.save("0_downsampled.npy", a)
 
 from netCDF4 import Dataset
-rootgrp = Dataset("isotropic128.nc", "w", format="NETCDF4")
+rootgrp = Dataset("isotropic128_downsample.nc", "w", format="NETCDF4")
 #velocity = rootgrp.createGroup("velocity")
 u = rootgrp.createDimension("u")
 v = rootgrp.createDimension("v")
