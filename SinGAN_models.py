@@ -311,7 +311,7 @@ def reflection_pad3D(frame, padding, device):
                     correct_z = frame.shape[4] - 2*padding - z
                 else:
                     correct_z = z - frame.shape[4] + 2*padding
-                frame[x, y, z] = frame[correct_x, correct_y, correct_z]
+                frame[:, :, x, y, z] = frame[:, :, correct_x, correct_y, correct_z]
     return frame
 
 def laplace_pyramid_downscale2D(frame, level, downscale_per_level, device):
