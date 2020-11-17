@@ -22,6 +22,8 @@ save_folder = os.path.join(MVTVSSR_folder_path, "SavedModels")
 
 a = np.load("0.npy")
 a = a[:,::8,::8,::8]
+
+#a = laplace_pyramid_downscale3D(np2torch(a, "cuda:0"), 3, 0.5, "cuda:0", periodic=True)[0].cpu().numpy()
 np.save("0_downsampled.npy", a)
 
 from netCDF4 import Dataset
