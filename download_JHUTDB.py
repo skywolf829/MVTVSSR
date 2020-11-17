@@ -161,6 +161,7 @@ print("finished")
 print(time.time() - t0)
 #lJHTDB.finalize()
 
+'''
 from netCDF4 import Dataset
 rootgrp = Dataset("test.nc", "w", format="NETCDF4")
 velocity = rootgrp.createGroup("velocity")
@@ -179,7 +180,7 @@ vs[:] = f[:,:,:,1]
 ws[:] = f[:,:,:,2]
 
 #velocities[:] = f
-
+'''
 
 '''
 f = np.array(frames)
