@@ -288,6 +288,32 @@ def mag_difference(t1, t2):
     '''
     return mag_diff
 
+def reflection_pad3D(frame, padding, device):
+    frame = F.pad(frame, 
+    [padding, padding, padding, padding, padding, padding])
+    indices_to_fix = []
+    for i in range(0, padding):
+        indices_to_fix.append(i)
+    for i in range(frame.shape[2] - padding):
+        indices_to_fix.append(i)
+    for x in indices_to_fix:
+        if(x < padding):
+            correct_x = frame.shape[2] - 2*padding - x
+        else:
+            correct_x = x - frame.shape[2] + 2*padding
+        for y in indices_to_fix:
+            if(y < padding):
+                correct_y = frame.shape[3] - 2*padding - y
+            else:
+                correct_y = y - frame.shape[3] + 2*padding
+            for z in indices_to_fix:
+                if(z < padding):
+                    correct_z = frame.shape[4] - 2*padding - z
+                else:
+                    correct_z = z - frame.shape[4] + 2*padding
+                frame[x, y, z] = frame[correct_x, correct_y, correct_z]
+    return frame
+
 def laplace_pyramid_downscale2D(frame, level, downscale_per_level, device):
     kernel_size = 5
     sigma = 2 * (1 / downscale_per_level) / 6
@@ -319,7 +345,7 @@ def laplace_pyramid_downscale2D(frame, level, downscale_per_level, device):
     del gaussian_kernel
     return frame
 
-def laplace_pyramid_downscale3D(frame, level, downscale_per_level, device):
+def laplace_pyramid_downscale3D(frame, level, downscale_per_level, device, periodic=False):
     kernel_size = 5
     sigma = 2 * (1 / downscale_per_level) / 6
 
@@ -350,6 +376,8 @@ def laplace_pyramid_downscale3D(frame, level, downscale_per_level, device):
     with torch.no_grad():
         for i in range(level):
             s = (input_size * (downscale_per_level**(i+1))).astype(int)
+            if(periodic):
+                frame = reflection_pad3D(frame, int(kernel_size / 2))
             frame = F.conv3d(frame, gaussian_kernel, groups=frame.shape[1])
             frame = F.interpolate(frame, size = list(s), mode='nearest')
     del gaussian_kernel
@@ -866,11 +894,12 @@ def train_single_scale(generators, discriminators, opt):
                     if(opt['mode'] == '3D'):
                         path_loss = pathline_loss3D(r, optimal_reconstruction, 
                         opt['pathline_res'], opt['pathline_res'], opt['pathline_res'], 
-                        1, opt['pathline_length'], opt['device'], periodic=False) * opt['alpha_6']
+                        1, opt['pathline_length'], opt['device'], 
+                        periodic=opt['periodic']) * opt['alpha_6']
                     elif(opt['mode'] == '2D'):
                         path_loss = pathline_loss2D(r, optimal_reconstruction, 
                         opt['pathline_res'], opt['pathline_res'], 
-                        1, opt['pathline_length'], opt['device'], periodic=False) * opt['alpha_6']
+                        1, opt['pathline_length'], opt['device'], periodic=opt['periodic']) * opt['alpha_6']
                     path_loss.backward(retain_graph=True)
                     path_loss = path_loss.item()
                 

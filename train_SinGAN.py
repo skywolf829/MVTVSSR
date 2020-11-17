@@ -46,6 +46,7 @@ if __name__ == '__main__':
     parser.add_argument('--alpha_6',default=None, type=float,help='pathline loss coeff')
     parser.add_argument('--pathline_res',default=None, type=int,help='num seeds per dim')
     parser.add_argument('--pathline_length',default=None, type=int,help='timesteps to do pathlines')
+    parser.add_argument('--periodic',default=None, type=str2bool,help='is data periodic')
     parser.add_argument('--generator_steps',default=None, type=int,help='Number of generator steps to take')
     parser.add_argument('--discriminator_steps',default=None, type=int,help='Number of discriminator steps to take')
     parser.add_argument('--epochs',default=None, type=int,help='Number of epochs to use')

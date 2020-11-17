@@ -20,13 +20,23 @@ output_folder = os.path.join(MVTVSSR_folder_path, "Output")
 save_folder = os.path.join(MVTVSSR_folder_path, "SavedModels")
 
 
-a = np.load("0.npy")
-a = np2torch(a, "cuda:1").unsqueeze(0)
-b = torch.zeros(a.shape)
-b= laplace_pyramid_downscale3D(a[:,0:1], 2, 0.5, "cuda:1")
-c= laplace_pyramid_downscale3D(a[:,1:2], 2, 0.5, "cuda:1")
-d= laplace_pyramid_downscale3D(a[:,2:3], 2, 0.5, "cuda:1")
-e = torch.cat([b,c,d], axis=1)
-print(e.shape)
-e = e.cpu().numpy()[0]
-np.save("0.npy", e)
+a = np.load("D:\\GitHub\\MVTVSSR\\InputData\\JHUturbulence\\isotropic128_full\\0.npy")
+
+from netCDF4 import Dataset
+rootgrp = Dataset("isotropic128.nc", "w", format="NETCDF4")
+#velocity = rootgrp.createGroup("velocity")
+u = rootgrp.createDimension("u")
+v = rootgrp.createDimension("v")
+w = rootgrp.createDimension("w")
+c = rootgrp.createDimension("channels", 3)
+us = rootgrp.createVariable("u", np.float32, ("u","v","w"))
+vs = rootgrp.createVariable("v", np.float32, ("u","v","w"))
+ws = rootgrp.createVariable("w", np.float32, ("u","v","w"))
+mags = rootgrp.createVariable("magnitude", np.float32, ("u","v","w"))
+us[:] = a[0,:,:,:]
+vs[:] = a[1,:,:,:]
+ws[:] = a[2,:,:,:]
+
+m = np.linalg.norm(a,axis=0)
+
+mags[:] = m

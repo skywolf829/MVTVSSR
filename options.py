@@ -53,6 +53,7 @@ class Options():
         opt["alpha_6"]                 = 0.5  # Lagrangian transport loss
         opt['pathline_res']            = 8
         opt['pathline_length']            = 50
+        opt['periodic']                = False
         opt["generator_steps"]         = 3
         opt["discriminator_steps"]     = 3
         opt["epochs"]                  = 2000
