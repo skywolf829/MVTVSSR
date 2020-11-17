@@ -294,7 +294,7 @@ def reflection_pad3D(frame, padding, device):
     indices_to_fix = []
     for i in range(0, padding):
         indices_to_fix.append(i)
-    for i in range(frame.shape[2] - padding):
+    for i in range(frame.shape[2] - padding, frame.shape[2]):
         indices_to_fix.append(i)
     for x in indices_to_fix:
         if(x < padding):
