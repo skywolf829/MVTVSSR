@@ -892,14 +892,14 @@ def train_single_scale(generators, discriminators, opt):
                     gen_err_total += gradient_loss_adj.item()
                 if(opt["alpha_6"] > 0):
                     if(opt['mode'] == '3D'):
-                        path_loss = pathline_loss3D(r, optimal_reconstruction, 
-                        opt['pathline_res'], opt['pathline_res'], opt['pathline_res'], 
-                        1, opt['pathline_length'], opt['device'], 
+                        path_loss = streamline_loss3D(r, optimal_reconstruction, 
+                        opt['streamline_res'], opt['streamline_res'], opt['streamline_res'], 
+                        1, opt['streamline_length'], opt['device'], 
                         periodic=opt['periodic']) * opt['alpha_6']
                     elif(opt['mode'] == '2D'):
-                        path_loss = pathline_loss2D(r, optimal_reconstruction, 
-                        opt['pathline_res'], opt['pathline_res'], 
-                        1, opt['pathline_length'], opt['device'], periodic=opt['periodic']) * opt['alpha_6']
+                        path_loss = streamline_loss2D(r, optimal_reconstruction, 
+                        opt['streamline_res'], opt['streamline_res'], 
+                        1, opt['streamline_length'], opt['device'], periodic=opt['periodic']) * opt['alpha_6']
                     path_loss.backward(retain_graph=True)
                     path_loss = path_loss.item()
                 

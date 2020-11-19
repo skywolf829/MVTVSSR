@@ -51,8 +51,8 @@ class Options():
         opt["alpha_4"]                 = 100       # mag_and_angle loss
         opt["alpha_5"]                 = 1          # first derivative loss coeff
         opt["alpha_6"]                 = 0.5  # Lagrangian transport loss
-        opt['pathline_res']            = 8
-        opt['pathline_length']            = 50
+        opt['streamline_res']            = 8
+        opt['streamline_length']            = 50
         opt['periodic']                = False
         opt["generator_steps"]         = 3
         opt["discriminator_steps"]     = 3
