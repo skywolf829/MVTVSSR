@@ -194,7 +194,7 @@ def streamline_loss3D(real_VF, rec_VF, x_res, y_res, z_res, ts_per_sec, time_len
             particles_real += flow_real.permute(1,0) * (1 / ts_per_sec)
             particles_rec += flow_rec.permute(1,0) * (1 / ts_per_sec)
 
-            transport_loss += torch.norm(particles_real[indices] -particles_rec[indices], dim=1).mean()
+            transport_loss += torch.norm(particles_real -particles_rec, dim=1).mean()
         else:
             indices = (particles_real[:,0] > 0.0) & (particles_real[:,1] > 0.0) & \
             (particles_real[:,2] > 0.0) & (particles_rec[:,0] > 0.0) & (particles_rec[:,1] > 0.0) & \
