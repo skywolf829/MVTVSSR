@@ -226,7 +226,7 @@ def adaptive_streamline_loss3D(real_VF, rec_VF, error_volume, n, octtree_levels,
             for y_start in range(error_volume.shape[1]):
                 for z_start in range(error_volume.shape[2]):
                     error_in_domain = error_volume[x_start:x_start+domain_size,
-                    y_start:y_start+domain_size,z_start:z_start+domain_size] / e_total
+                    y_start:y_start+domain_size,z_start:z_start+domain_size].sum() / e_total
                     n_particles_in_domain = int(n * error_in_domain)
                     for i in range(n_particles_in_domain):
                         particles_real[:,current_spot] = torch.rand([3]) * domain_size
