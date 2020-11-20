@@ -240,6 +240,7 @@ def adaptive_streamline_loss3D(real_VF, rec_VF, error_volume, n, octtree_levels,
         particles_real[1,current_spot] += y_start
         particles_real[2,current_spot] += z_start
 
+    particles_real = particles_real.transpose(0,1)
     particles_rec = particles_real.clone()
     
     transport_loss = torch.autograd.Variable(torch.tensor(0.0).to(device))
@@ -259,7 +260,7 @@ def adaptive_streamline_loss3D(real_VF, rec_VF, error_volume, n, octtree_levels,
             particles_real += flow_real.permute(1,0) * (1 / ts_per_sec)
             particles_rec += flow_rec.permute(1,0) * (1 / ts_per_sec)
 
-            transport_loss += torch.norm(particles_real[indices] -particles_rec[indices], dim=1).mean()
+            transport_loss += torch.norm(particles_real -particles_rec, dim=1).mean()
         else:
             indices = (particles_real[:,0] > 0.0) & (particles_real[:,1] > 0.0) & \
             (particles_real[:,2] > 0.0) & (particles_rec[:,0] > 0.0) & (particles_rec[:,1] > 0.0) & \
