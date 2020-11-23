@@ -565,7 +565,7 @@ def super_resolution(generator, frame, factor, opt, device):
     frame = generator(frame, opt["noise_amplitudes"][-1]*noise)
     return frame
 
-def save_models(generators, discriminators, opt):
+def save_models(generators, discriminators, opt, optimizer=None):
     folder = create_folder(opt["save_folder"], opt["save_name"])
     path_to_save = os.path.join(opt["save_folder"], folder)
     print_to_log_and_console("Saving model to %s" % (path_to_save), 
@@ -689,13 +689,13 @@ def train_single_scale(generators, discriminators, opt):
     generator_optimizer = optim.Adam(generator.parameters(), lr=opt["learning_rate"], 
     betas=(opt["beta_1"],opt["beta_2"]))
     generator_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer=generator_optimizer,
-    milestones=[1600],gamma=opt['gamma'])
+    milestones=[1600-opt['iteration_number']],gamma=opt['gamma'])
 
     discriminator_optimizer = optim.Adam(filter(lambda p: p.requires_grad, discriminator.parameters()), 
     lr=opt["learning_rate"], 
     betas=(opt["beta_1"],opt["beta_2"]))
     discriminator_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer=discriminator_optimizer,
-    milestones=[1600],gamma=opt['gamma'])
+    milestones=[1600-opt['iteration_number']],gamma=opt['gamma'])
  
     writer = SummaryWriter(os.path.join('tensorboard',opt['save_name']))
 
@@ -894,12 +894,12 @@ def train_single_scale(generators, discriminators, opt):
                     if(opt['mode'] == '3D'):
                         if(opt['adaptive_streamlines']):
                             path_loss = adaptive_streamline_loss3D(r, optimal_reconstruction, 
-                            mags + angles, 64, 3, 1, opt['streamline_length'], opt['device'], periodic=opt['periodic'])* opt['alpha_6']
+                            mags[0] + angles[0], 64, 3, 1, opt['streamline_length'], opt['device'], periodic=opt['periodic'])* opt['alpha_6']
                         else:
                             path_loss = streamline_loss3D(r, optimal_reconstruction, 
                             opt['streamline_res'], opt['streamline_res'], opt['streamline_res'], 
                             1, opt['streamline_length'], opt['device'], 
-                            periodic=opt['periodic']) * opt['alpha_6']
+                            periodic=opt['periodic'] and optimal_reconstruction.shape == real.shape) * opt['alpha_6']
                     elif(opt['mode'] == '2D'):
                         path_loss = streamline_loss2D(r, optimal_reconstruction, 
                         opt['streamline_res'], opt['streamline_res'], 
