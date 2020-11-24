@@ -215,7 +215,8 @@ def streamline_loss3D(real_VF, rec_VF, x_res, y_res, z_res, ts_per_sec, time_len
             
     return transport_loss / (time_length * ts_per_sec)
 
-def adaptive_streamline_loss3D(real_VF, rec_VF, error_volume, n, octtree_levels, ts_per_sec, time_length, device, periodic=False):
+def adaptive_streamline_loss3D(real_VF, rec_VF, error_volume, n, octtree_levels,
+ts_per_sec, time_length, device, periodic=False):
     e_total = error_volume.sum()
     particles_real = torch.zeros([3, n*octtree_levels], device=device)
     current_spot = 0
@@ -281,7 +282,6 @@ def adaptive_streamline_loss3D(real_VF, rec_VF, error_volume, n, octtree_levels,
             
     return transport_loss / (time_length * ts_per_sec)
     
-
 def streamline_loss2D(real_VF, rec_VF, x_res, y_res, ts_per_sec, time_length, device, periodic=False):
     x = torch.arange(0, real_VF.shape[2], real_VF.shape[2] / x_res, 
     dtype=torch.float32).view(-1, 1).repeat([1, y_res])

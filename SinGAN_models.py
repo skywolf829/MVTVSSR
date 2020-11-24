@@ -820,7 +820,7 @@ def train_single_scale(generators, discriminators, opt):
                         TV_penalty_fake = torch.abs(discrim_error_fake+1)
                         TV_penalty_fake.backward(retain_graph=True)
                     discriminator_optimizer.step()
-            torch.autograd.set_detect_anomaly(True)
+
             # Update generator: maximize D(G(z))
             for j in range(opt["generator_steps"]):
                 generator.zero_grad()

@@ -31,7 +31,8 @@ SpatialInterpolation = client.get_type('ns0:SpatialInterpolation')
 TemporalInterpolation = client.get_type('ns0:TemporalInterpolation')
 token="edu.osu.buckeyemail.wurster.18-92fb557b" #replace with your own token
 
-def get_frame(x_start, x_end, y_start, y_end, z_start, z_end, 
+def get_frame(x_start, x_end, x_step, y_start, y_end, y_step, 
+z_start, z_end, z_step, 
 sim_name, timestep, field, num_components):
     #print(x_start)
     #print(x_end)
@@ -40,18 +41,21 @@ sim_name, timestep, field, num_components):
     #print(z_start)
     #print(z_end)
     result=client.service.GetAnyCutoutWeb(token,sim_name, field, timestep,
-                                            x_start+1, y_start+1, z_start+1, x_end, y_end, z_end,
-                                            1, 1, 1, 0, "")  # put empty string for the last parameter
+                                            x_start+1, y_start+1, 
+                                            z_start+1, x_end, y_end, z_end,
+                                            x_step, y_step, z_step, 0, "")  # put empty string for the last parameter
     # transfer base64 format to numpy
-    nx=x_end-x_start
-    ny=y_end-y_start
-    nz=z_end-z_start
+    nx=int((x_end-x_start)/x_step)
+    ny=int((y_end-y_start)/y_step)
+    nz=int((z_end-z_start)/z_step)
     base64_len=int(nx*ny*nz*num_components)
     base64_format='<'+str(base64_len)+'f'
 
     result=struct.unpack(base64_format, result)
     result=np.array(result).reshape((nz, ny, nx, num_components))
-    return result, x_start, x_end, y_start, y_end, z_start, z_end
+    return result, int(x_start/x_step), int(x_end/x_step), \
+    int(y_start/x_step), int(y_end/y_step),\
+    int(z_start/z_step), int(z_end/z_step)
 
 '''
 
@@ -88,7 +92,10 @@ sim_name, timestep, field, num_components):
                 x_stop = min(i+x_len, x_end)
                 y_stop = min(j+y_len, y_end)
                 z_stop = min(k+1, z_end)
-                full[k:z_stop,j:y_stop,i:x_stop,:] = get_frame(i,x_stop, j, y_stop, k, z_stop, sim_name, timestep, field, num_components)[0]
+                full[k:z_stop,j:y_stop,i:x_stop,:] = get_frame(i,x_stop,x_step, 
+                j, y_stop, y_step,
+                k, z_stop, z_step,
+                sim_name, timestep, field, num_components)[0]
     return full
 
 def download_file(url, file_name):
@@ -99,10 +106,13 @@ def download_file(url, file_name):
     except requests.exceptions.RequestException as e:
        return e
 
-def get_full_frame_parallel(x_start, x_end, y_start, y_end, z_start, z_end,
+def get_full_frame_parallel(x_start, x_end, x_step,
+y_start, y_end, y_step, z_start, z_end, z_step,
 sim_name, timestep, field, num_components, num_workers):
     threads= []
-    full = np.zeros((z_end-z_start, y_end-y_start, x_end-x_start, num_components), dtype=np.float32)
+    full = np.zeros((int((z_end-z_start)/z_step), 
+    int((y_end-y_start)/y_step), 
+    int((x_end-x_start)/x_step), num_components), dtype=np.float32)
     with ThreadPoolExecutor(max_workers=num_workers) as executor:
         done = 0
         x_len = 128
@@ -114,9 +124,14 @@ sim_name, timestep, field, num_components, num_workers):
                     x_stop = min(i+x_len, x_end)
                     y_stop = min(j+y_len, y_end)
                     z_stop = min(k+z_len, z_end)
-                    threads.append(executor.submit(get_frame, i,x_stop, j, y_stop, k, z_stop, sim_name, timestep, field, num_components))
+                    threads.append(executor.submit(get_frame, 
+                    i,x_stop, x_step,
+                    j, y_stop, y_step,
+                    k, z_stop, z_step,
+                    sim_name, timestep, field, num_components))
         for task in as_completed(threads):
            r, x1, x2, y1, y2, z1, z2 = task.result()
+          
            full[z1-z_start:z2-z_start,
            y1-y_start:y2-y_start,
            x1-x_start:x2-x_start,:] = r.astype(np.float32)
@@ -135,13 +150,13 @@ frames = []
 name = "isotropic1024coarse"
 t0 = time.time()
 count = 0
-endts = 2
+endts = 500
 ts_skip = 25
 for i in range(1, endts, ts_skip):
     print("TS %i/%i" % (i, endts))
-    f = get_full_frame_parallel(0, 1024, #x
-    0, 1024, #y
-    0, 1024, #z
+    f = get_full_frame_parallel(0, 1024, 8,#x
+    0, 1024, 8, #y
+    0, 1024, 8, #z
     name, i, 
     "u", 3, 
     64)
@@ -149,7 +164,7 @@ for i in range(1, endts, ts_skip):
     #name,
     #str(count) + ".npy"), f[0].swapaxes(0,2).swapaxes(1,2).astype(np.float32))
     print(f.shape)
-    np.save("0.npy", f.astype(np.float32).swapaxes(0,3).swapaxes(3,2).swapaxes(2,1))
+    np.save(str(i-1)+".npy", f.astype(np.float32).swapaxes(0,3).swapaxes(3,2).swapaxes(2,1))
     count += 1
     frames.append(f[0])
 #f = laplace_pyramid_downscale3D(np2torch(f, 

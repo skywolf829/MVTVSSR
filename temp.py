@@ -20,7 +20,7 @@ output_folder = os.path.join(MVTVSSR_folder_path, "Output")
 save_folder = os.path.join(MVTVSSR_folder_path, "SavedModels")
 
 
-a = np.load("0_downsampled.npy")
+a = np.load("475.npy")
 #a = a[:,::8,::8,::8]
 
 '''
@@ -32,7 +32,7 @@ np.save("0_downsampled_gaussian.npy", a)
 '''
 
 from netCDF4 import Dataset
-rootgrp = Dataset("isotropic128_downsampled.nc", "w", format="NETCDF4")
+rootgrp = Dataset("isotropic128_downsampled_475.nc", "w", format="NETCDF4")
 #velocity = rootgrp.createGroup("velocity")
 u = rootgrp.createDimension("u")
 v = rootgrp.createDimension("v")

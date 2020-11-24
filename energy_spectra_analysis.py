@@ -15,32 +15,6 @@ from scipy import signal
 import tidynamics
 from numpy import sqrt, zeros, conj, pi, arange, ones, convolve
 
-MVTVSSR_folder_path = os.path.dirname(os.path.abspath(__file__))
-input_folder = os.path.join(MVTVSSR_folder_path, "InputData")
-output_folder = os.path.join(MVTVSSR_folder_path, "Output")
-save_folder = os.path.join(MVTVSSR_folder_path, "SavedModels")
-
-parser = argparse.ArgumentParser(description='Test a trained model')
-
-parser.add_argument('--load_from',default="128_GP_0.5")
-parser.add_argument('--data_folder',default="JHUturbulence/isotropic128_3D",type=str,help='File to test on')
-parser.add_argument('--data_folder_diffsize',default="JHUturbulence/isotropic512_3D",type=str,help='File to test on')
-parser.add_argument('--device',default="cuda:0",type=str,help='Frames to use from training file')
-
-args = vars(parser.parse_args())
-opt = Options.get_default()
-
-opt = load_options(os.path.join(save_folder, args["load_from"]))
-opt["device"] = args["device"]
-opt["save_name"] = args["load_from"]
-generators, discriminators = load_models(opt,args["device"])
-gen_to_use = 0
-for i in range(len(generators)):
-    generators[i] = generators[i].to(args["device"])
-    generators[i] = generators[i].eval()
-for i in range(len(discriminators)):
-    discriminators[i].to(args["device"])
-    discriminators[i].eval()
 
 def get_ks(x, y, z, xmax, ymax, zmax, device):
     xxx = torch.arange(x,device=device).type(torch.cuda.FloatTensor).view(-1, 1,1).repeat(1, y, z)
@@ -93,6 +67,53 @@ def generate_patchwise(generator, LR, mode):
                 y+y_offset:y+noise.shape[3],
                 x+x_offset:x+noise.shape[4]] = result[:,:,z_offset:,y_offset:,x_offset:]
     return generated_image
+
+
+def compute_tke_spectrum_pytorch(u,v,w,lx,ly,lz,smooth):
+    import torch.fft
+    nx = len(u[:,0,0])
+    ny = len(v[0,:,0])
+    nz = len(w[0,0,:])
+
+    nt= nx*ny*nz
+    n = nx #int(np.round(np.power(nt,1.0/3.0)))
+
+    uh = torch.fft.fft(u)/nt
+    vh = torch.fft.fft(v)/nt
+    wh = torch.fft.fft(w)/nt
+
+    tkeh = torch.zeros((nx,ny,nz))
+    tkeh = 0.5*(uh*torch.conj(uh) + vh*torch.conj(vh) + wh*torch.conj(wh)).real
+
+    k0x = 2.0*pi/lx
+    k0y = 2.0*pi/ly
+    k0z = 2.0*pi/lz
+
+    knorm = (k0x + k0y + k0z)/3.0
+
+    kxmax = nx/2
+    kymax = ny/2
+    kzmax = nz/2
+
+    wave_numbers = knorm*torch.arange(0,n)
+
+    tke_spectrum = torch.zeros([len(wave_numbers)])
+    ks = get_ks(nx, ny, nz, kxmax, kymax, kzmax, "cuda:0")
+    for k in range(0, min(len(tke_spectrum), ks.max())):
+        tke_spectrum[k] = torch.sum(tkeh[ks == k]).item()
+    #tkeh = tkeh.cpu().numpy()
+   
+    tke_spectrum = tke_spectrum/knorm
+    #  tke_spectrum = tke_spectrum[1:]
+    #  wave_numbers = wave_numbers[1:]
+    if smooth:
+        tkespecsmooth = movingaverage(tke_spectrum, 5) #smooth the spectrum
+        tkespecsmooth[0:4] = tke_spectrum[0:4] # get the first 4 values from the original data
+        tke_spectrum = tkespecsmooth
+
+    knyquist = knorm*min(nx,ny,nz)/2 
+
+    return knyquist, wave_numbers, tke_spectrum
 
 def compute_tke_spectrum(u,v,w,lx,ly,lz,smooth):
     """
@@ -154,7 +175,6 @@ def compute_tke_spectrum(u,v,w,lx,ly,lz,smooth):
     ks = get_ks(nx, ny, nz, kxmax, kymax, kzmax, "cuda:0")
     tkeh = np2torch(tkeh, "cuda:0")
     for k in range(0, min(len(tke_spectrum), ks.max())):
-        print(k)
         tke_spectrum[k] = torch.sum(tkeh[ks == k]).item()
     tkeh = tkeh.cpu().numpy()
     '''
@@ -186,67 +206,96 @@ def compute_tke_spectrum(u,v,w,lx,ly,lz,smooth):
 
     return knyquist, wave_numbers, tke_spectrum
 
-dataset2 = Dataset(os.path.join(input_folder, args["data_folder"]), opt)
-dataset = Dataset(os.path.join(input_folder, args["data_folder_diffsize"]), opt)
+if __name__ == '__main__':
+    
+    MVTVSSR_folder_path = os.path.dirname(os.path.abspath(__file__))
+    input_folder = os.path.join(MVTVSSR_folder_path, "InputData")
+    output_folder = os.path.join(MVTVSSR_folder_path, "Output")
+    save_folder = os.path.join(MVTVSSR_folder_path, "SavedModels")
 
-f = dataset[0].cuda()
+    parser = argparse.ArgumentParser(description='Test a trained model')
 
-a = dataset.unscale(f).cpu().numpy()[0]
+    parser.add_argument('--load_from',default="128_GP_0.5")
+    parser.add_argument('--data_folder',default="JHUturbulence/isotropic128_3D",type=str,help='File to test on')
+    parser.add_argument('--data_folder_diffsize',default="JHUturbulence/isotropic512_3D",type=str,help='File to test on')
+    parser.add_argument('--device',default="cuda:0",type=str,help='Frames to use from training file')
 
-b, c, d = compute_tke_spectrum(a[0], a[1], a[2], 
-2 * pi * (a.shape[1] / 1024.0), 2 * pi * (a.shape[2] / 1024), 
-2 * pi * (a.shape[3] / 1024.0), True)
+    args = vars(parser.parse_args())
+    opt = Options.get_default()
 
-ks = []
-dis=0.0928
-for i in c:
-    if(i == 0):
-        ks.append(1.6 * (dis**(2.0/3.0)))
-    else:
-        ks.append(1.6 * (dis**(2.0/3.0)) * ((i) **(-5.0/3.0)))
-ks = np.array(ks)
-c[0] += 1
+    opt = load_options(os.path.join(save_folder, args["load_from"]))
+    opt["device"] = args["device"]
+    opt["save_name"] = args["load_from"]
+    generators, discriminators = load_models(opt,args["device"])
+    gen_to_use = 0
+    for i in range(len(generators)):
+        generators[i] = generators[i].to(args["device"])
+        generators[i] = generators[i].eval()
+    for i in range(len(discriminators)):
+        discriminators[i].to(args["device"])
+        discriminators[i].eval()
+
+    dataset2 = Dataset(os.path.join(input_folder, args["data_folder"]), opt)
+    dataset = Dataset(os.path.join(input_folder, args["data_folder_diffsize"]), opt)
+
+    f = dataset[0].cuda()
+
+    a = dataset.unscale(f).cpu().numpy()[0]
+
+    b, c, d = compute_tke_spectrum(a[0], a[1], a[2], 
+    2 * pi * (a.shape[1] / 1024.0), 2 * pi * (a.shape[2] / 1024), 
+    2 * pi * (a.shape[3] / 1024.0), True)
+
+    ks = []
+    dis=0.0928
+    for i in c:
+        if(i == 0):
+            ks.append(1.6 * (dis**(2.0/3.0)))
+        else:
+            ks.append(1.6 * (dis**(2.0/3.0)) * ((i) **(-5.0/3.0)))
+    ks = np.array(ks)
+    c[0] += 1
 
 
-plt.plot(c[c < b], ks[c < b], color='black')
-plt.plot(c[c < b], d[c < b], color='red')
+    plt.plot(c[c < b], ks[c < b], color='black')
+    plt.plot(c[c < b], d[c < b], color='red')
 
-f_lr = laplace_pyramid_downscale3D(f, opt['n']-gen_to_use-1,
-opt['spatial_downscale_ratio'],
-opt['device'])
+    f_lr = laplace_pyramid_downscale3D(f, opt['n']-gen_to_use-1,
+    opt['spatial_downscale_ratio'],
+    opt['device'])
 
-f_trilin = dataset.unscale(F.interpolate(f_lr, mode='trilinear', size=[512, 512, 512])).cpu()[0].numpy()
-b, c, d = compute_tke_spectrum(f_trilin[0], f_trilin[1], f_trilin[2], 
-2 * pi * (f_trilin.shape[1] / 1024.0), 2 * pi * (f_trilin.shape[2] / 1024), 
-2 * pi * (f_trilin.shape[3] / 1024.0), True)
+    f_trilin = dataset.unscale(F.interpolate(f_lr, mode='trilinear', size=[512, 512, 512])).cpu()[0].numpy()
+    b, c, d = compute_tke_spectrum(f_trilin[0], f_trilin[1], f_trilin[2], 
+    2 * pi * (f_trilin.shape[1] / 1024.0), 2 * pi * (f_trilin.shape[2] / 1024), 
+    2 * pi * (f_trilin.shape[3] / 1024.0), True)
 
-plt.plot(c[c < b], d[c < b], color='blue')
+    plt.plot(c[c < b], d[c < b], color='blue')
 
-with torch.no_grad():
-    singan_output = f_lr.clone()
-    singan_output = F.interpolate(singan_output, size=[256, 256, 256], mode='trilinear', align_corners=True)
-    singan_output = generate_patchwise(generators[1], singan_output,
-    "reconstruct")
+    with torch.no_grad():
+        singan_output = f_lr.clone()
+        singan_output = F.interpolate(singan_output, size=[256, 256, 256], mode='trilinear', align_corners=True)
+        singan_output = generate_patchwise(generators[1], singan_output,
+        "reconstruct")
 
-b, c, d = compute_tke_spectrum(singan_output[0], singan_output[1], singan_output[2], 
-2 * pi * (singan_output.shape[1] / 1024.0), 2 * pi * (singan_output.shape[2] / 1024), 
-2 * pi * (singan_output.shape[3] / 1024.0), True)
+    b, c, d = compute_tke_spectrum(singan_output[0], singan_output[1], singan_output[2], 
+    2 * pi * (singan_output.shape[1] / 1024.0), 2 * pi * (singan_output.shape[2] / 1024), 
+    2 * pi * (singan_output.shape[3] / 1024.0), True)
 
-plt.plot(c[c < b], d[c < b], color='green')
-with torch.no_grad():
-    singan_output = F.interpolate(singan_output, size=[512, 512, 512], mode='trilinear', align_corners=True)
-    singan_output = generate_patchwise(generators[2], singan_output,
-    "reconstruct")
-b, c, d = compute_tke_spectrum(singan_output[0], singan_output[1], singan_output[2], 
-2 * pi * (singan_output.shape[1] / 1024.0), 2 * pi * (singan_output.shape[2] / 1024), 
-2 * pi * (singan_output.shape[3] / 1024.0), True)
+    plt.plot(c[c < b], d[c < b], color='green')
+    with torch.no_grad():
+        singan_output = F.interpolate(singan_output, size=[512, 512, 512], mode='trilinear', align_corners=True)
+        singan_output = generate_patchwise(generators[2], singan_output,
+        "reconstruct")
+    b, c, d = compute_tke_spectrum(singan_output[0], singan_output[1], singan_output[2], 
+    2 * pi * (singan_output.shape[1] / 1024.0), 2 * pi * (singan_output.shape[2] / 1024), 
+    2 * pi * (singan_output.shape[3] / 1024.0), True)
 
-plt.plot(c[c < b], d[c < b], color='orange')
+    plt.plot(c[c < b], d[c < b], color='orange')
 
-plt.yscale("log", nonpositive="clip")
-plt.xscale("log", nonpositive="clip")
-plt.xlabel("wavenumber")
-plt.title("Energy Spectra")
-plt.legend(["1.6*epsilon^(2/3)*k^(-5/3)", "Ground truth data", "Trilinear", 
-"SinGAN - intermediate", "SinGAN - final"])
-plt.show()
+    plt.yscale("log", nonpositive="clip")
+    plt.xscale("log", nonpositive="clip")
+    plt.xlabel("wavenumber")
+    plt.title("Energy Spectra")
+    plt.legend(["1.6*epsilon^(2/3)*k^(-5/3)", "Ground truth data", "Trilinear", 
+    "SinGAN - intermediate", "SinGAN - final"])
+    plt.show()
