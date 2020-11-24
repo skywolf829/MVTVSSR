@@ -753,9 +753,17 @@ def train_single_scale(generators, discriminators, opt):
         starts_all = [list(np.array(real.shape[2:]) * 0)]
         ends_all = [list(np.array(real.shape[2:]))]
 
+    time_start = 0
+    time_L1 =0
+    time_grad = 0
+    time_sl = 0
+    time_logging = 0
+    time_step = 0
     for epoch in range(opt['iteration_number'], opt["epochs"]):
 
         for patch_in_training in range(len(starts_all)):
+            
+            t = time.time()
             D_loss = 0
             G_loss = 0        
             gradient_loss = 0
@@ -774,6 +782,7 @@ def train_single_scale(generators, discriminators, opt):
             elif(opt['mode'] == "3D"):
                 r = real[:,:,starts[0]:ends[0],starts[1]:ends[1],starts[2]:ends[2]]
             
+            time_start += time.time() - t
             
             # Update discriminator: maximize D(x) + D(G(z))
             if(opt["alpha_2"] > 0.0):            
@@ -830,7 +839,6 @@ def train_single_scale(generators, discriminators, opt):
                 phys_loss = 0
                 path_loss = 0
                 loss = nn.L1Loss().to(opt["device"])
-                
                 if(opt["alpha_2"] > 0.0):
                     fake = generator(fake_prev_view, noise.detach())
                     output = discriminator(fake)
@@ -865,13 +873,17 @@ def train_single_scale(generators, discriminators, opt):
                         gen_err_total += phys_loss.item()
                         phys_loss = phys_loss.item()
                 if(opt['alpha_4'] > 0.0):
+                    
+                    t = time.time()
                     cs = torch.nn.CosineSimilarity(dim=1).to(opt['device'])
                     mags = torch.abs(torch.norm(optimal_reconstruction, dim=1) - torch.norm(r, dim=1))
                     angles = torch.abs(cs(optimal_reconstruction, r) - 1) / 2
                     r_loss = opt['alpha_4'] * (mags.mean() + angles.mean()) / 2
                     r_loss.backward(retain_graph=True)
                     gen_err_total += r_loss.item()
+                    time_L1 += time.time() - t
                 if(opt['alpha_5'] > 0.0):
+                    t = time.time()
                     real_gradient = []
                     rec_gradient = []
                     for ax1 in range(r.shape[1]):
@@ -890,11 +902,14 @@ def train_single_scale(generators, discriminators, opt):
                     gradient_loss_adj = gradient_loss * opt['alpha_5']
                     gradient_loss_adj.backward(retain_graph=True)
                     gen_err_total += gradient_loss_adj.item()
+                    time_grad += time.time() - t
                 if(opt["alpha_6"] > 0):
+                    t = time.time()
                     if(opt['mode'] == '3D'):
                         if(opt['adaptive_streamlines']):
                             path_loss = adaptive_streamline_loss3D(r, optimal_reconstruction, 
-                            mags[0] + angles[0], 64, 3, 1, opt['streamline_length'], opt['device'], periodic=opt['periodic'])* opt['alpha_6']
+                            mags[0] + angles[0], 64, 3, 1, opt['streamline_length'], opt['device'], 
+                            periodic=opt['periodic'])* opt['alpha_6']
                         else:
                             path_loss = streamline_loss3D(r, optimal_reconstruction, 
                             opt['streamline_res'], opt['streamline_res'], opt['streamline_res'], 
@@ -906,9 +921,13 @@ def train_single_scale(generators, discriminators, opt):
                         1, opt['streamline_length'], opt['device'], periodic=opt['periodic']) * opt['alpha_6']
                     path_loss.backward(retain_graph=True)
                     path_loss = path_loss.item()
+                    time_sl += time.time() - t
                 
+                t = time.time()
                 generator_optimizer.step()
-            
+                time_step += time.time() - t
+        
+        t = time.time()
         if(epoch % 50 == 0):
             if(opt['alpha_1'] > 0.0 or opt['alpha_4'] > 0.0):
                 rec_numpy = optimal_reconstruction.detach().cpu().numpy()[0]
@@ -970,9 +989,16 @@ def train_single_scale(generators, discriminators, opt):
         writer.add_scalar('path_loss/%i'%len(generators), path_loss / (opt['alpha_6']+1e-6), epoch)
         writer.add_scalar('Mag_loss_scale/%i'%len(generators), mags.mean(), epoch) 
         writer.add_scalar('Angle_loss_scale/%i'%len(generators), angles.mean(), epoch) 
+        time_logging += time.time() - t
+
+        t = time.time()
         discriminator_scheduler.step()
         generator_scheduler.step()
+        time_step += time.time() - t
     
+    print("start: %0.02f, L1: %0.02f, grad: %0.02f, streamlines: %0.02f, logging: %0.02f, step: %0.02f"\
+    % (time_start, time_L1, time_grad, time_sl, time_logging, time_step))
+
     generator = reset_grads(generator, False)
     generator.eval()
     discriminator = reset_grads(discriminator, False)

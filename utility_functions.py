@@ -217,11 +217,13 @@ def streamline_loss3D(real_VF, rec_VF, x_res, y_res, z_res, ts_per_sec, time_len
 
 def adaptive_streamline_loss3D(real_VF, rec_VF, error_volume, n, octtree_levels,
 ts_per_sec, time_length, device, periodic=False):
+
     e_total = error_volume.sum()
     particles_real = torch.zeros([3, n*octtree_levels], device=device)
     current_spot = 0
+
     for octtreescale in range(octtree_levels):
-        domain_size = int((1.0 / (2**octtree_levels)) * error_volume.shape[0])
+        domain_size = int((1.0 / (2**octtreescale)) * error_volume.shape[0])
         for x_start in range(0, error_volume.shape[0]-1, domain_size):
             for y_start in range(0, error_volume.shape[1], domain_size):
                 for z_start in range(0, error_volume.shape[2], domain_size):
@@ -235,6 +237,7 @@ ts_per_sec, time_length, device, periodic=False):
                             particles_real[1,current_spot] += y_start
                             particles_real[2,current_spot] += z_start
                             current_spot += 1
+
     if(current_spot < particles_real.shape[0]):
         particles_real[:,current_spot] = torch.rand([3]) * error_volume.shape[0]
         #particles_real[0,current_spot] += x_start
@@ -279,7 +282,6 @@ ts_per_sec, time_length, device, periodic=False):
             particles_rec[indices] += flow_rec.permute(1,0) * (1 / ts_per_sec)
             
             transport_loss += torch.norm(particles_real[indices] -particles_rec[indices], dim=1).mean()
-            
     return transport_loss / (time_length * ts_per_sec)
     
 def streamline_loss2D(real_VF, rec_VF, x_res, y_res, ts_per_sec, time_length, device, periodic=False):
@@ -473,7 +475,6 @@ def create_folder(start_path, folder_name):
         except OSError:
             print_to_log_and_console ("Creation of the directory %s failed" % full_path)
     return f_name
-
 
 class GaussianSmoothing(nn.Module):
     """
