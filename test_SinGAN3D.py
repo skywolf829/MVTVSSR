@@ -56,7 +56,8 @@ dataset = Dataset(os.path.join(input_folder, args["data_folder"]), opt)
 
 
 models_to_try = ["iso128_baseline", "iso128_streamline0.5", 
-"iso128_streamline0.5_periodic", "iso128_streamline0.5_periodic_adaptive"]
+"iso128_streamline0.5_periodic", "iso128_streamline0.5_periodic_adaptive",
+"iso128_streamline0.5_periodic_adaptive_cnnonly"]
 
 streamline_errors = []
 PSNRs = []
@@ -122,7 +123,7 @@ for model_name in models_to_try:
         streams.append(s)
 
         num_ts += 1
-        if(ts == 0):
+        if(ts == 475):
             save_VF(upscaled_data[0], model_name)
 
     PSNRs.append(ps)
@@ -146,7 +147,8 @@ for ts in range(0, 500, 25):
         opt['spatial_downscale_ratio'],
         "cuda:0")
     
-    upscaled_data = F.interpolate(data_lr, size=[128,128,128], mode='trilinear')
+    upscaled_data = F.interpolate(data_lr, size=[128,128,128],
+    mode='trilinear', align_corners=True)
 
     p = PSNR(data, upscaled_data, data.max() - data.min())
     m = ((upscaled_data - data)**2).mean()
@@ -173,7 +175,7 @@ for ts in range(0, 500, 25):
     mses.append(m)
     streams.append(s)
 
-    if(ts == 0):
+    if(ts == 475):
         save_VF(upscaled_data[0], "trilin")
         save_VF(dataset.unscale(data)[0], "gt")
 
