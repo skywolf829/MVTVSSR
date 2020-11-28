@@ -895,7 +895,7 @@ def train_single_scale(generators, discriminators, opt):
                     if(opt['mode'] == '3D'):
                         if(opt['adaptive_streamlines']):
                             path_loss = adaptive_streamline_loss3D(r, optimal_reconstruction, 
-                            mags[0] + angles[0], 64, 3, 1, opt['streamline_length'], opt['device'], 
+                            mags[0] + angles[0], int(opt['streamline_res']**3), 3, 1, opt['streamline_length'], opt['device'], 
                             periodic=opt['periodic'])* opt['alpha_6']
                         else:
                             path_loss = streamline_loss3D(r, optimal_reconstruction, 

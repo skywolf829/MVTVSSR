@@ -224,26 +224,28 @@ ts_per_sec, time_length, device, periodic=False):
 
     for octtreescale in range(octtree_levels):
         domain_size = int((1.0 / (2**octtreescale)) * error_volume.shape[0])
+        
         for x_start in range(0, error_volume.shape[0]-1, domain_size):
             for y_start in range(0, error_volume.shape[1], domain_size):
                 for z_start in range(0, error_volume.shape[2], domain_size):
-                    if(error_volume.shape[0] - domain_size > x_start):
                         error_in_domain = error_volume[x_start:x_start+domain_size,
                         y_start:y_start+domain_size,z_start:z_start+domain_size].sum() / e_total
                         n_particles_in_domain = int(n * error_in_domain)
+
                         for i in range(n_particles_in_domain):
                             particles_real[:,current_spot] = torch.rand([3]) * domain_size
                             particles_real[0,current_spot] += x_start
                             particles_real[1,current_spot] += y_start
                             particles_real[2,current_spot] += z_start
                             current_spot += 1
-
-    if(current_spot < particles_real.shape[0]):
+                            
+    while(current_spot < particles_real.shape[0]):
         particles_real[:,current_spot] = torch.rand([3]) * error_volume.shape[0]
         #particles_real[0,current_spot] += x_start
         #particles_real[1,current_spot] += y_start
         #particles_real[2,current_spot] += z_start
-
+        current_spot += 1
+        
     particles_real = particles_real.transpose(0,1)
     particles_rec = particles_real.clone()
     
