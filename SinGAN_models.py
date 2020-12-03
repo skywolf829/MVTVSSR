@@ -753,11 +753,11 @@ def train_single_scale(generators, discriminators, opt):
     else:
         starts_all = [list(np.array(real.shape[2:]) * 0)]
         ends_all = [list(np.array(real.shape[2:]))]
-
+    print(starts_all)
+    print(ends_all)
     for epoch in range(opt['iteration_number'], opt["epochs"]):
 
         for patch_in_training in range(len(starts_all)):
-            print(patch_in_training)
             D_loss = 0
             G_loss = 0        
             gradient_loss = 0
