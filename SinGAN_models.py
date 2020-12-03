@@ -1290,6 +1290,7 @@ class Dataset(torch.utils.data.Dataset):
         starts = []
         rf = receptive_field
         ends = []
+        print(max(1,frame.shape[2]-patch_size+1))
         if(mode == "3D"):
             for z in range(0,max(1,frame.shape[2]-patch_size+1), patch_size-2*rf):
                 z = min(z, max(0, frame.shape[2] - patch_size))
