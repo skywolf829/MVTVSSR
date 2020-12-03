@@ -747,14 +747,12 @@ def train_single_scale(generators, discriminators, opt):
             optimal_LR = torch.zeros(generator.get_input_shape(), device=opt["device"])
 
     if(curr_size > max_dim):
-        print("getting list")
         starts_all, ends_all = dataset.get_patch_ranges(real, opt["training_patch_size"], 
         int(generator.receptive_field() / 2), opt['mode'])
     else:
         starts_all = [list(np.array(real.shape[2:]) * 0)]
         ends_all = [list(np.array(real.shape[2:]))]
-    print(starts_all)
-    print(ends_all)
+
     for epoch in range(opt['iteration_number'], opt["epochs"]):
 
         for patch_in_training in range(len(starts_all)):
@@ -1290,7 +1288,6 @@ class Dataset(torch.utils.data.Dataset):
         starts = []
         rf = receptive_field
         ends = []
-        print(max(1,frame.shape[2]-patch_size+1))
         if(mode == "3D"):
             for z in range(0,max(1,frame.shape[2]), patch_size-2*rf):
                 z = min(z, max(0, frame.shape[2] - patch_size))
