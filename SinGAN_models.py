@@ -749,7 +749,7 @@ def train_single_scale(generators, discriminators, opt):
     if(curr_size > max_dim):
         print("getting list")
         starts_all, ends_all = dataset.get_patch_ranges(real, opt["training_patch_size"], 
-        generator.receptive_field(), opt['mode'])
+        int(generator.receptive_field() / 2), opt['mode'])
     else:
         starts_all = [list(np.array(real.shape[2:]) * 0)]
         ends_all = [list(np.array(real.shape[2:]))]
