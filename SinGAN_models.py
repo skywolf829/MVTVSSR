@@ -753,6 +753,8 @@ def train_single_scale(generators, discriminators, opt):
         starts_all = [list(np.array(real.shape[2:]) * 0)]
         ends_all = [list(np.array(real.shape[2:]))]
 
+    print(curr_size)
+    print(max_dim)
     for epoch in range(opt['iteration_number'], opt["epochs"]):
 
         for patch_in_training in range(len(starts_all)):
