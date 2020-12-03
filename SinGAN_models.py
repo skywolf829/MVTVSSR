@@ -1292,15 +1292,15 @@ class Dataset(torch.utils.data.Dataset):
         ends = []
         print(max(1,frame.shape[2]-patch_size+1))
         if(mode == "3D"):
-            for z in range(0,max(1,frame.shape[2]-patch_size+1), patch_size-2*rf):
+            for z in range(0,max(1,frame.shape[2]), patch_size-2*rf):
                 z = min(z, max(0, frame.shape[2] - patch_size))
                 z_stop = min(frame.shape[2], z + patch_size)
                 
-                for y in range(0, max(1,frame.shape[3]-patch_size+1), patch_size-2*rf):
+                for y in range(0, max(1,frame.shape[3]), patch_size-2*rf):
                     y = min(y, max(0, frame.shape[3] - patch_size))
                     y_stop = min(frame.shape[3], y + patch_size)
 
-                    for x in range(0, max(1,frame.shape[4]-patch_size+1), patch_size-2*rf):
+                    for x in range(0, max(1,frame.shape[4]), patch_size-2*rf):
                         x = min(x, max(0, frame.shape[4] - patch_size))
                         x_stop = min(frame.shape[4], x + patch_size)
 
