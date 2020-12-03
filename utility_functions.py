@@ -217,34 +217,39 @@ def streamline_loss3D(real_VF, rec_VF, x_res, y_res, z_res, ts_per_sec, time_len
 
 def adaptive_streamline_loss3D(real_VF, rec_VF, error_volume, n, octtree_levels,
 ts_per_sec, time_length, device, periodic=False):
-
+    
     e_total = error_volume.sum()
-    particles_real = torch.zeros([3, n*octtree_levels], device=device)
+    particles_real = torch.zeros([3, n], device=device)
     current_spot = 0
-
-    for octtreescale in range(octtree_levels):
-        domain_size = int((1.0 / (2**octtreescale)) * error_volume.shape[0])
-        
-        for x_start in range(0, error_volume.shape[0]-1, domain_size):
-            for y_start in range(0, error_volume.shape[1], domain_size):
-                for z_start in range(0, error_volume.shape[2], domain_size):
-                        error_in_domain = error_volume[x_start:x_start+domain_size,
-                        y_start:y_start+domain_size,z_start:z_start+domain_size].sum() / e_total
-                        n_particles_in_domain = int(n * error_in_domain)
-
-                        for i in range(n_particles_in_domain):
-                            particles_real[:,current_spot] = torch.rand([3]) * domain_size
-                            particles_real[0,current_spot] += x_start
-                            particles_real[1,current_spot] += y_start
-                            particles_real[2,current_spot] += z_start
-                            current_spot += 1
-                            
-    while(current_spot < particles_real.shape[0]):
-        particles_real[:,current_spot] = torch.rand([3]) * error_volume.shape[0]
-        #particles_real[0,current_spot] += x_start
-        #particles_real[1,current_spot] += y_start
-        #particles_real[2,current_spot] += z_start
-        current_spot += 1
+    octtreescale = 3
+    #for octtreescale in range(octtree_levels):
+    domain_size = int((1.0 / (2**octtreescale)) * error_volume.shape[0])
+    
+    for x_start in range(0, error_volume.shape[0]-1, domain_size):
+        for y_start in range(0, error_volume.shape[1], domain_size):
+            for z_start in range(0, error_volume.shape[2], domain_size):
+                error_in_domain = error_volume[x_start:x_start+domain_size,
+                y_start:y_start+domain_size,z_start:z_start+domain_size].sum() / e_total
+                n_particles_in_domain = int(n * error_in_domain)
+                
+                particles_real[:,current_spot:current_spot+n_particles_in_domain] = \
+                torch.rand([3,n_particles_in_domain]) * domain_size
+                particles_real[0,current_spot:current_spot+n_particles_in_domain] += \
+                x_start
+                particles_real[1,current_spot:current_spot+n_particles_in_domain] += \
+                y_start
+                particles_real[2,current_spot:current_spot+n_particles_in_domain] += \
+                z_start
+                current_spot += n_particles_in_domain
+                '''
+                for i in range(n_particles_in_domain):
+                    particles_real[:,current_spot] = torch.rand([3]) * domain_size
+                    particles_real[0,current_spot] += x_start
+                    particles_real[1,current_spot] += y_start
+                    particles_real[2,current_spot] += z_start
+                    current_spot += 1
+                '''
+    particles_real[:,current_spot:] = torch.rand([3, particles_real.shape[1]-current_spot]) * error_volume.shape[0]
         
     particles_real = particles_real.transpose(0,1)
     particles_rec = particles_real.clone()

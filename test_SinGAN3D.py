@@ -55,8 +55,13 @@ opt["device"] = args["device"]
 dataset = Dataset(os.path.join(input_folder, args["data_folder"]), opt)
 
 
-models_to_try = ["iso128_baseline", "iso128_streamline0.5", 
-"iso128_streamline0.5_periodic", "iso128_streamline0.5_periodic_adaptive",
+models_to_try = [
+#"iso128_baseline", "iso128_streamline0.5", 
+#"iso128_streamline0.5_periodic", 
+#"iso128_streamline0.5_periodic2",
+#"iso128_streamline0.5_periodic_adaptive",
+"iso128_periodic_cnnonly",
+"iso128_0.5streamlineperiodic_cnnonly",
 "iso128_streamline0.5_periodic_adaptive_cnnonly"]
 
 streamline_errors = []

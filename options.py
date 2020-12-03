@@ -6,7 +6,7 @@ class Options():
         opt = {}
         # Input info
         opt["mode"]                    = "3D"      # What SinGAN to use - 2D or 3D
-        opt["data_folder"]             = "JHUturbulence/isotropic128_full"
+        opt["data_folder"]             = "JHUturbulence/isotropic128_downsampled"
         #opt["data_folder"]             = "TestImage"
         opt["image_normalize"]         = False
         opt["scale_data"]              = False
@@ -52,7 +52,7 @@ class Options():
         opt["alpha_5"]                 = 1          # first derivative loss coeff
         opt["alpha_6"]                 = 0.5  # Lagrangian transport loss
         opt["adaptive_streamlines"]    = False
-        opt['streamline_res']          = 8
+        opt['streamline_res']          = 12
         opt['streamline_length']       = 50
         opt['periodic']                = True
         opt["generator_steps"]         = 3
