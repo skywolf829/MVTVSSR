@@ -159,6 +159,7 @@ def streamline_distance(pl1, pl2):
     return d
 
 def streamline_loss3D(real_VF, rec_VF, x_res, y_res, z_res, ts_per_sec, time_length, device, periodic=False):
+    '''
     x = torch.arange(0, real_VF.shape[2], real_VF.shape[2] / x_res, 
     dtype=torch.float32).view(-1, 1, 1).repeat([1, y_res, z_res])
     x = x.view(1,x_res,y_res, z_res)
@@ -176,7 +177,10 @@ def streamline_loss3D(real_VF, rec_VF, x_res, y_res, z_res, ts_per_sec, time_len
     particles_rec = torch.cat([x, y, z],axis=0)
     particles_rec = torch.reshape(particles_rec, [3, -1]).transpose(0,1)
     particles_rec = particles_rec.to(device)
-    
+    '''
+    particles_real = torch.rand([3,x_res*y_res*z_res]).to(device).transpose(0,1) * real_VF.shape[2]
+    particles_rec = particles_real.clone()
+
     transport_loss = torch.autograd.Variable(torch.tensor(0.0).to(device))
     for i in range(0, time_length * ts_per_sec):
 

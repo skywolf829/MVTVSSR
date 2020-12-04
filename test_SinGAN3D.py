@@ -60,9 +60,9 @@ models_to_try = [
 #"iso128_streamline0.5_periodic", 
 #"iso128_streamline0.5_periodic2",
 #"iso128_streamline0.5_periodic_adaptive",
-"iso128_periodic_cnnonly",
-"iso128_0.5streamlineperiodic_cnnonly",
-"iso128_streamline0.5_periodic_adaptive_cnnonly"]
+"iso128_cnn_baseline",
+"iso128_cnn_streamlines0.5",
+"iso128_cnn_streamlines0.5_adaptive"]
 
 streamline_errors = []
 PSNRs = []
