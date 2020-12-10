@@ -472,7 +472,13 @@ generated_image=None, start_scale=0):
             LR = F.interpolate(generated_image, 
             size=generators[i].resolution, mode=opt["upsample_mode"], align_corners=True)
             generated_image = torch.zeros(generators[i].get_input_shape()).to(device)
-            
+
+            if(mode == "reconstruct"):
+                full_noise = generators[i].optimal_noise
+            elif(mode == "random"):
+                full_noise = torch.randn(generators[i].optimal_noise.shape, device=device)
+
+
             if(opt['mode'] == "2D"):
                 for y in range(0,max(1,generated_image.shape[2]-patch_size+1), patch_size-2*rf):
                     y = min(y, max(0, generated_image.shape[2] - patch_size))
@@ -501,25 +507,30 @@ generated_image=None, start_scale=0):
                         y+y_offset:y+noise.shape[2],
                         x+x_offset:x+noise.shape[3]] = result[:,:,y_offset:,x_offset:]
 
+        
             elif(opt['mode'] == '3D'):
-                for z in range(0,max(1, generated_image.shape[2]-patch_size+1), patch_size-2*rf):
-                    z = min(z, max(0, generated_image.shape[2] - patch_size))
-                    z_stop = min(generated_image.shape[2], z + patch_size)
+                
+                z_done = False
+                z = 0
+                z_stop = min(generated_image.shape[2], z + patch_size)
+                while(not z_done):
+                    if(z_stop == generated_image.shape[2]):
+                        z_done = True
+                    y_done = False
+                    y = 0
+                    y_stop = min(generated_image.shape[3], y + patch_size)
+                    while(not y_done):
+                        if(y_stop == generated_image.shape[3]):
+                            y_done = True
+                        x_done = False
+                        x = 0
+                        x_stop = min(generated_image.shape[4], x + patch_size)
+                        while(not x_done):                        
+                            if(x_stop == generated_image.shape[4]):
+                                x_done = True
 
-                    for y in range(0,max(1, generated_image.shape[3]-patch_size+1), patch_size-2*rf):
-                        y = min(y, max(0, generated_image.shape[3] - patch_size))
-                        y_stop = min(generated_image.shape[3], y + patch_size)
+                            noise = full_noise[:,:,z:z_stop,y:y_stop,x:x_stop]
 
-                        for x in range(0,max(1, generated_image.shape[4]-patch_size+1), patch_size-2*rf):
-                            x = min(x, max(0, generated_image.shape[4] - patch_size))
-                            x_stop = min(generated_image.shape[4], x + patch_size)
-
-                            if(mode == "reconstruct"):
-                                noise = generators[i].optimal_noise[:,:,z:z_stop,y:y_stop,x:x_stop]
-                            elif(mode == "random"):
-                                noise = torch.randn([generated_image.shape[0], generated_image.shape[1],
-                                z_stop-z,y_stop-y,x_stop-x], device=device)
-                            
                             #print("[%i:%i, %i:%i, %i:%i]" % (z, z_stop, y, y_stop, x, x_stop))
                             result = generators[i](LR[:,:,z:z_stop,y:y_stop,x:x_stop], 
                             opt["noise_amplitudes"][i]*noise)
@@ -532,6 +543,16 @@ generated_image=None, start_scale=0):
                             z+z_offset:z+noise.shape[2],
                             y+y_offset:y+noise.shape[3],
                             x+x_offset:x+noise.shape[4]] = result[:,:,z_offset:,y_offset:,x_offset:]
+
+                            x += patch_size - 2*rf
+                            x = min(x, max(0, generated_image.shape[4] - patch_size))
+                            x_stop = min(generated_image.shape[4], x + patch_size)
+                        y += patch_size - 2*rf
+                        y = min(y, max(0, generated_image.shape[3] - patch_size))
+                        y_stop = min(generated_image.shape[3], y + patch_size)
+                    z += patch_size - 2*rf
+                    z = min(z, max(0, generated_image.shape[2] - patch_size))
+                    z_stop = min(generated_image.shape[2], z + patch_size)
 
 
     #seq.append(generated_image.detach().cpu().numpy()[0].swapaxes(0,2).swapaxes(0,1))

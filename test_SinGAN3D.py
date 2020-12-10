@@ -60,9 +60,7 @@ models_to_try = [
 #"iso128_streamline0.5_periodic", 
 #"iso128_streamline0.5_periodic2",
 #"iso128_streamline0.5_periodic_adaptive",
-"iso128_cnn_baseline",
-"iso128_cnn_streamlines0.5",
-"iso128_cnn_streamlines0.5_adaptive"]
+"iso128_gan"]
 
 streamline_errors = []
 PSNRs = []
@@ -73,7 +71,8 @@ labels = []
 for model_name in models_to_try:
     print(model_name)
     labels.append(model_name)
-    opt["save_name"] = model_name
+    opt = load_options(os.path.join(save_folder, model_name))
+    opt['device'] = "cuda:0"
     generators, discriminators = load_models(opt,args["device"])
 
     for i in range(len(generators)):
@@ -128,7 +127,7 @@ for model_name in models_to_try:
         streams.append(s)
 
         num_ts += 1
-        if(ts == 475):
+        if(ts == 0):
             save_VF(upscaled_data[0], model_name)
 
     PSNRs.append(ps)
@@ -180,7 +179,7 @@ for ts in range(0, 500, 25):
     mses.append(m)
     streams.append(s)
 
-    if(ts == 475):
+    if(ts == 0):
         save_VF(upscaled_data[0], "trilin")
         save_VF(dataset.unscale(data)[0], "gt")
 

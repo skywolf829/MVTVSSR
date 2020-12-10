@@ -48,10 +48,10 @@ def bilinear_interpolate(im, x, y):
     wd = (x-x0.type(dtype)) * (y-y0.type(dtype))
     return Ia*wa + Ib*wb + Ic*wc + Id*wd
 
-def trilinear_interpolate(im, x, y, z):
+def trilinear_interpolate(im, x, y, z, periodic=False):
     dtype = torch.cuda.FloatTensor
     dtype_long = torch.cuda.LongTensor
-    
+
     x0 = torch.floor(x).type(dtype_long)
     x1 = x0 + 1
     
@@ -60,26 +60,48 @@ def trilinear_interpolate(im, x, y, z):
 
     z0 = torch.floor(z).type(dtype_long)
     z1 = z0 + 1
-
-    x0 = torch.clamp(x0, 0, im.shape[2]-1).type(dtype_long)
-    x1 = torch.clamp(x1, 0, im.shape[2]-1).type(dtype_long)
-
-    y0 = torch.clamp(y0, 0, im.shape[3]-1).type(dtype_long)
-    y1 = torch.clamp(y1, 0, im.shape[3]-1).type(dtype_long)
-
-    z0 = torch.clamp(z0, 0, im.shape[4]-1).type(dtype_long)
-    z1 = torch.clamp(z1, 0, im.shape[4]-1).type(dtype_long)
     
-    c00 = im[0,:,x0,y0,z0] * (x1.type(dtype)-x) + im[0,:,x1,y0,z0]*(x-x0.type(dtype))
-    c01 = im[0,:,x0,y0,z1] * (x1.type(dtype)-x) + im[0,:,x1,y0,z1]*(x-x0.type(dtype))
-    c10 = im[0,:,x0,y1,z0] * (x1.type(dtype)-x) + im[0,:,x1,y1,z0]*(x-x0.type(dtype))
-    c11 = im[0,:,x0,y1,z1] * (x1.type(dtype)-x) + im[0,:,x1,y1,z1]*(x-x0.type(dtype))
+    if(periodic):
+        x1_diff = x1-x
+        x0_diff = 1-x1_diff  
+        y1_diff = y1-y
+        y0_diff = 1-y1_diff
+        z1_diff = z1-z
+        z0_diff = 1-z1_diff
 
-    c0 = c00 * (y1.type(dtype)-y) + c10 * (y-y0.type(dtype))
-    c1 = c01 * (y1.type(dtype)-y) + c11 * (y-y0.type(dtype))
+        x0 %= im.shape[2]
+        y0 %= im.shape[3]
+        z0 %= im.shape[4]
 
-    c = c0 * (z1.type(dtype)-z) + c1 * (z-z0.type(dtype))
+        x1 %= im.shape[2]
+        y1 %= im.shape[3]
+        z1 %= im.shape[4]
+        
+    else:
+        x0 = torch.clamp(x0, 0, im.shape[2]-1)
+        x1 = torch.clamp(x1, 0, im.shape[2]-1)
+        y0 = torch.clamp(y0, 0, im.shape[3]-1)
+        y1 = torch.clamp(y1, 0, im.shape[3]-1)
+        z0 = torch.clamp(z0, 0, im.shape[4]-1)
+        z1 = torch.clamp(z1, 0, im.shape[4]-1)
+        x1_diff = x1-x
+        x0_diff = x-x0    
+        y1_diff = y1-y
+        y0_diff = y-y0
+        z1_diff = z1-z
+        z0_diff = z-z0
+    
+    c00 = im[0,:,x0,y0,z0] * x1_diff + im[0,:,x1,y0,z0]*x0_diff
+    c01 = im[0,:,x0,y0,z1] * x1_diff + im[0,:,x1,y0,z1]*x0_diff
+    c10 = im[0,:,x0,y1,z0] * x1_diff + im[0,:,x1,y1,z0]*x0_diff
+    c11 = im[0,:,x0,y1,z1] * x1_diff + im[0,:,x1,y1,z1]*x0_diff
+
+    c0 = c00 * y1_diff + c10 * y0_diff
+    c1 = c01 * y1_diff + c11 * y0_diff
+
+    c = c0 * z1_diff + c1 * z0_diff
     return c
+    
     
 def lagrangian_transport(VF, x_res, y_res, time_length, ts_per_sec, device):
     #x = torch.arange(-1, 1, int(VF.shape[2] / x_res), dtype=torch.float32).unsqueeze(1).expand([int(VF.shape[2] / x_res), int(VF.shape[3] / y_res)]).unsqueeze(0)
@@ -159,46 +181,37 @@ def streamline_distance(pl1, pl2):
     return d
 
 def streamline_loss3D(real_VF, rec_VF, x_res, y_res, z_res, ts_per_sec, time_length, device, periodic=False):
-    '''
-    x = torch.arange(0, real_VF.shape[2], real_VF.shape[2] / x_res, 
-    dtype=torch.float32).view(-1, 1, 1).repeat([1, y_res, z_res])
-    x = x.view(1,x_res,y_res, z_res)
-    y = torch.arange(0, real_VF.shape[3], real_VF.shape[3] / y_res, 
-    dtype=torch.float32).view(1, -1, 1).repeat([x_res, 1, z_res])
-    y = y.view(1,x_res,y_res, z_res)
-    z = torch.arange(0, real_VF.shape[4], real_VF.shape[4] / z_res, 
-    dtype=torch.float32).view(1, 1, -1).repeat([x_res, y_res, 1])
-    z = z.view(1,x_res,y_res, z_res)
     
-    particles_real = torch.cat([x, y, z],axis=0)
-    particles_real = torch.reshape(particles_real, [3, -1]).transpose(0,1)
-    particles_real = particles_real.to(device)
-
-    particles_rec = torch.cat([x, y, z],axis=0)
-    particles_rec = torch.reshape(particles_rec, [3, -1]).transpose(0,1)
-    particles_rec = particles_rec.to(device)
-    '''
+    t_start = time.time()
+    t = time.time()
     particles_real = torch.rand([3,x_res*y_res*z_res]).to(device).transpose(0,1) * real_VF.shape[2]
     particles_rec = particles_real.clone()
-
+    t_create_particles = time.time() - t
+    t_add = 0
+    t_interp = 0
     transport_loss = torch.autograd.Variable(torch.tensor(0.0).to(device))
+
     for i in range(0, time_length * ts_per_sec):
 
         if(periodic):
+            t = time.time()
             flow_real = trilinear_interpolate(real_VF, 
             particles_real[:,0] % real_VF.shape[2], 
             particles_real[:,1] % real_VF.shape[3], 
-            particles_real[:,2] % real_VF.shape[4])
+            particles_real[:,2] % real_VF.shape[4], periodic = periodic)
 
             flow_rec = trilinear_interpolate(rec_VF, 
             particles_rec[:,0] % rec_VF.shape[2], 
             particles_rec[:,1] % rec_VF.shape[3], 
-            particles_rec[:,2] % rec_VF.shape[4])
+            particles_rec[:,2] % rec_VF.shape[4], periodic = periodic)
+            t_interp += time.time() - t
 
+            t = time.time()
             particles_real += flow_real.permute(1,0) * (1 / ts_per_sec)
             particles_rec += flow_rec.permute(1,0) * (1 / ts_per_sec)
 
             transport_loss += torch.norm(particles_real -particles_rec, dim=1).mean()
+            t_add += time.time() - t
         else:
             indices = (particles_real[:,0] > 0.0) & (particles_real[:,1] > 0.0) & \
             (particles_real[:,2] > 0.0) & (particles_rec[:,0] > 0.0) & (particles_rec[:,1] > 0.0) & \
@@ -207,16 +220,19 @@ def streamline_loss3D(real_VF, rec_VF, x_res, y_res, z_res, ts_per_sec, time_len
             (particles_rec[:,2] < rec_VF.shape[4] ) 
             
             flow_real = trilinear_interpolate(real_VF, 
-            particles_real[indices,0], particles_real[indices,1], particles_real[indices,2])
+            particles_real[indices,0], particles_real[indices,1], particles_real[indices,2], 
+            periodic = periodic)
 
             flow_rec = trilinear_interpolate(rec_VF, 
-            particles_rec[indices,0], particles_rec[indices,1], particles_rec[indices,2])
+            particles_rec[indices,0], particles_rec[indices,1], particles_rec[indices,2], 
+            periodic = periodic)
 
             particles_real[indices] += flow_real.permute(1,0) * (1 / ts_per_sec)
             particles_rec[indices] += flow_rec.permute(1,0) * (1 / ts_per_sec)
             
             transport_loss += torch.norm(particles_real[indices] -particles_rec[indices], dim=1).mean()
-            
+    
+    #print("t_init: %0.07f, t_interp: %0.05f, t_add: %0.07f, t_total: %0.07f" % (t_create_particles, t_interp, t_add, time.time()-t_start))
     return transport_loss / (time_length * ts_per_sec)
 
 def adaptive_streamline_loss3D(real_VF, rec_VF, error_volume, n, octtree_levels,

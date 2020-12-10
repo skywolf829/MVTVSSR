@@ -19,20 +19,18 @@ input_folder = os.path.join(MVTVSSR_folder_path, "InputData")
 output_folder = os.path.join(MVTVSSR_folder_path, "Output")
 save_folder = os.path.join(MVTVSSR_folder_path, "SavedModels")
 
+model_name = "iso128_gan"
+opt = load_options(os.path.join(save_folder, model_name))
+opt['device'] = "cuda:0"
+generators, discriminators = load_models(opt,"cuda:0")
 
-a = np.load("475.npy")
-#a = a[:,::8,::8,::8]
-
-'''
-a_0 = laplace_pyramid_downscale3D(np2torch(a[0:1], "cuda:0").unsqueeze(0), 3, 0.5, "cuda:0", periodic=True)
-a_1 = laplace_pyramid_downscale3D(np2torch(a[1:2], "cuda:0").unsqueeze(0), 3, 0.5, "cuda:0", periodic=True)
-a_2 = laplace_pyramid_downscale3D(np2torch(a[2:3], "cuda:0").unsqueeze(0), 3, 0.5, "cuda:0", periodic=True)
-a = torch.cat([a_0, a_1, a_2], axis=1).cpu().numpy()[0]
-np.save("0_downsampled_gaussian.npy", a)
-'''
+out = generate_by_patch(generators, "random", opt, "cuda:0", 128)
+print(out.shape)
+out = out[0].cpu().numpy()
+a = out
 
 from netCDF4 import Dataset
-rootgrp = Dataset("isotropic128_downsampled_475.nc", "w", format="NETCDF4")
+rootgrp = Dataset("iso128_gan.nc", "w", format="NETCDF4")
 #velocity = rootgrp.createGroup("velocity")
 u = rootgrp.createDimension("u")
 v = rootgrp.createDimension("v")
