@@ -148,7 +148,7 @@ frames = []
 
 #name = "channel"
 #name = "isotropic1024coarse"
-mame="mixing"
+name="mixing"
 t0 = time.time()
 count = 0
 endts = 500
