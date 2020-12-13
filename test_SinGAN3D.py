@@ -9,11 +9,13 @@ import argparse
 from typing import Union, Tuple
 from matplotlib.pyplot import cm
 from math import log
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 from skimage.transform.pyramids import pyramid_reduce
 from energy_spectra_analysis import *
+from scipy import stats
 
-def save_VF(vf, name):
+def save_VF(vf, name, error_field=None, streamline_error_field=None, particle_seeds=None):
     from netCDF4 import Dataset
     rootgrp = Dataset(name+".nc", "w", format="NETCDF4")
     
@@ -28,6 +30,16 @@ def save_VF(vf, name):
     us[:] = vf[0,:,:,:].cpu().numpy()
     vs[:] = vf[1,:,:,:].cpu().numpy()
     ws[:] = vf[2,:,:,:].cpu().numpy()
+
+    if(error_field is not None):
+        errs = rootgrp.createVariable("err", np.float32, ("u","v","w"))
+        errs[:] = error_field
+    if(streamline_error_field is not None):
+        stream_errs = rootgrp.createVariable("streamline_err", np.float32, ("u","v","w"))
+        stream_errs[:] = streamline_error_field
+    if(particle_seeds is not None):
+        seeds = rootgrp.createVariable("seeds", np.float32, ("u","v","w"))
+        seeds[:] = particle_seeds
 
     m = np.linalg.norm(vf.cpu().numpy(),axis=0)
 
@@ -60,7 +72,9 @@ models_to_try = [
 #"iso128_streamline0.5_periodic", 
 #"iso128_streamline0.5_periodic2",
 #"iso128_streamline0.5_periodic_adaptive",
-"iso128_gan"]
+"iso128_cnn_baseline",
+"iso128_cnn_streamlines0.5",
+"iso128_cnn_streamlines0.5_adaptive"]
 
 streamline_errors = []
 PSNRs = []
@@ -102,12 +116,15 @@ for model_name in models_to_try:
         generated_image=data_lr, start_scale=1)
 
         p = PSNR(data, upscaled_data, data.max() - data.min())
-        m = ((upscaled_data - data)**2).mean()
-        s = streamline_loss3D(data, upscaled_data, 
-        opt['streamline_res'], opt['streamline_res'], opt['streamline_res'], 
-        1, opt['streamline_length'], opt['device'], periodic=True)
+        m = torch.abs(upscaled_data - data)
+        s = streamline_err_volume(data, upscaled_data, opt['streamline_res'], 1,
+        opt['streamline_length'], opt['device'], periodic=True).cpu().numpy()
 
+        cs = torch.nn.CosineSimilarity(dim=1).to(opt['device'])
+        mags = torch.abs(torch.norm(upscaled_data, dim=1) - torch.norm(data, dim=1))
+        angles = torch.abs(cs(upscaled_data, data) - 1) / 2
         upscaled_data = dataset.unscale(upscaled_data)
+
         if(energy_spectrum is None):
             knyquist, wave_numbers, e_s = \
             compute_tke_spectrum(upscaled_data[0,0].cpu().numpy(), 
@@ -122,13 +139,29 @@ for model_name in models_to_try:
             2 * pi, 2 * pi, 2 * pi, True)
             
             energy_spectrum += np.array(e_s[wave_numbers < knyquist])
+            
         ps.append(p)
-        mses.append(m)
-        streams.append(s)
+        mses.append((m**2).mean())
+        streams.append(s.mean())
 
         num_ts += 1
+       
         if(ts == 0):
-            save_VF(upscaled_data[0], model_name)
+            mpl.rcParams['agg.path.chunksize'] = 128*128*128*4
+            save_VF(upscaled_data[0], model_name, 
+            error_field=(mags+angles)[0].cpu().numpy(), streamline_error_field=s, 
+            particle_seeds=sample_adaptive_streamline_seeds((mags+angles)[0], 128*128*128, opt['device']).cpu().numpy())
+            plt.scatter((mags+angles)[0].cpu().numpy().flatten(), s.flatten())
+            plt.title("Error field vs streamline error field")
+            plt.xlabel("Error field")
+            plt.ylabel("Streamline error field")
+            xs = np.array([(mags+angles).min(), (mags+angles).max()])
+            slope, intercept, r_value, p_value, std_err = stats.linregress((mags+angles)[0].cpu().numpy().flatten(), s.flatten())
+            plt.plot(xs, intercept+slope*xs, 'r')
+            plt.show()
+            print("slope: %0.04f, intercept: %0.04f, r_value: %0.04f, p_value: %0.04f, std_err: %0.04f" % \
+            (slope, intercept, r_value, p_value, std_err))
+
 
     PSNRs.append(ps)
     MSEs.append(mses)

@@ -147,7 +147,8 @@ sim_name, timestep, field, num_components, num_workers):
 frames = []
 
 #name = "channel"
-name = "isotropic1024coarse"
+#name = "isotropic1024coarse"
+mame="mixing"
 t0 = time.time()
 count = 0
 endts = 500

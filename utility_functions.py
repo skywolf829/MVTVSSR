@@ -180,11 +180,73 @@ def streamline_distance(pl1, pl2):
         d += torch.norm(pl1[i] - pl2[i], dim=1).sum()
     return d
 
+def streamline_err_volume(real_VF, rec_VF, res, ts_per_sec, time_length, device, periodic=False):
+    
+    x = torch.arange(0, real_VF.shape[2], 1, 
+    dtype=torch.float32).view(-1, 1, 1).repeat([1, real_VF.shape[3], real_VF.shape[4]])
+    x = x.view(real_VF.shape[2], real_VF.shape[3], real_VF.shape[4], 1)
+
+    y = torch.arange(0, real_VF.shape[3], 1, 
+    dtype=torch.float32).view(1, -1, 1).repeat([real_VF.shape[2], 1, real_VF.shape[4]])
+    y = y.view(real_VF.shape[2], real_VF.shape[3], real_VF.shape[4], 1)
+
+    z = torch.arange(0, real_VF.shape[4], 1, 
+    dtype=torch.float32).view(1, 1, -1).repeat([real_VF.shape[2], real_VF.shape[3], 1])
+    z = z.view(real_VF.shape[2], real_VF.shape[3], real_VF.shape[4], 1)
+
+    particles_real = torch.cat([x, y, z],axis=3).to(device)
+    particles_rec = particles_real.clone()
+    
+    transport_loss_volume = torch.zeros([real_VF.shape[2], real_VF.shape[3], real_VF.shape[4]], device=device)
+    
+    
+    for i in range(0, time_length * ts_per_sec):
+
+        if(periodic):
+            flow_real = trilinear_interpolate(real_VF, 
+            particles_real.reshape([-1, 3])[:,0] % real_VF.shape[2], 
+            particles_real.reshape([-1, 3])[:,1] % real_VF.shape[3], 
+            particles_real.reshape([-1, 3])[:,2] % real_VF.shape[4], periodic = periodic)
+            
+            flow_rec = trilinear_interpolate(rec_VF, 
+            particles_rec.reshape([-1, 3])[:,0] % rec_VF.shape[2], 
+            particles_rec.reshape([-1, 3])[:,1] % rec_VF.shape[3], 
+            particles_rec.reshape([-1, 3])[:,2] % rec_VF.shape[4], periodic = periodic)
+
+            particles_real += flow_real.transpose(0,1).reshape([real_VF.shape[2], real_VF.shape[3], real_VF.shape[4], 3])
+            particles_rec += flow_rec.transpose(0,1).reshape([real_VF.shape[2], real_VF.shape[3], real_VF.shape[4], 3])
+            transport_loss_volume += torch.norm(particles_real-particles_rec, dim=3)
+        else:
+            indices = (particles_real[:,0] > 0.0) & (particles_real[:,1] > 0.0) & \
+            (particles_real[:,2] > 0.0) & (particles_rec[:,0] > 0.0) & (particles_rec[:,1] > 0.0) & \
+            (particles_rec[:,2] > 0.0) & (particles_real[:,0] < real_VF.shape[2]) & (particles_real[:,1] < real_VF.shape[3]) & \
+            (particles_real[:,2] < real_VF.shape[4]) & (particles_rec[:,0] < rec_VF.shape[2]) & (particles_rec[:,1] < rec_VF.shape[3]) & \
+            (particles_rec[:,2] < rec_VF.shape[4] ) 
+            
+            flow_real = trilinear_interpolate(real_VF, 
+            particles_real[indices,0], particles_real[indices,1], particles_real[indices,2], 
+            periodic = periodic)
+
+            flow_rec = trilinear_interpolate(rec_VF, 
+            particles_rec[indices,0], particles_rec[indices,1], particles_rec[indices,2], 
+            periodic = periodic)
+
+            particles_real[indices] += flow_real.permute(1,0) * (1 / ts_per_sec)
+            particles_rec[indices] += flow_rec.permute(1,0) * (1 / ts_per_sec)
+            
+            transport_loss_volume += torch.norm(particles_real[indices] -particles_rec[indices], dim=1).transpose(0, 1).reshape([real_VF.shape[2], real_VF.shape[3], real_VF.shape[4]])
+    
+    #print("t_init: %0.07f, t_interp: %0.05f, t_add: %0.07f, t_total: %0.07f" % (t_create_particles, t_interp, t_add, time.time()-t_start))
+    return transport_loss_volume / (time_length * ts_per_sec)
+
 def streamline_loss3D(real_VF, rec_VF, x_res, y_res, z_res, ts_per_sec, time_length, device, periodic=False):
     
     t_start = time.time()
     t = time.time()
-    particles_real = torch.rand([3,x_res*y_res*z_res]).to(device).transpose(0,1) * real_VF.shape[2]
+    particles_real = torch.rand([3,x_res*y_res*z_res]).to(device).transpose(0,1)
+    particles_real[:,0] *= real_VF.shape[2]
+    particles_real[:,1] *= real_VF.shape[3]
+    particles_real[:,2] *= real_VF.shape[4]
     particles_rec = particles_real.clone()
     t_create_particles = time.time() - t
     t_add = 0
@@ -243,17 +305,27 @@ ts_per_sec, time_length, device, periodic=False):
     current_spot = 0
     octtreescale = 3
     #for octtreescale in range(octtree_levels):
-    domain_size = int((1.0 / (2**octtreescale)) * error_volume.shape[0])
+    domain_size_x = int((1.0 / (2**octtreescale)) * error_volume.shape[0])
+    domain_size_y = int((1.0 / (2**octtreescale)) * error_volume.shape[1])
+    domain_size_z = int((1.0 / (2**octtreescale)) * error_volume.shape[2])
     
-    for x_start in range(0, error_volume.shape[0]-1, domain_size):
-        for y_start in range(0, error_volume.shape[1], domain_size):
-            for z_start in range(0, error_volume.shape[2], domain_size):
-                error_in_domain = error_volume[x_start:x_start+domain_size,
-                y_start:y_start+domain_size,z_start:z_start+domain_size].sum() / e_total
+    for x_start in range(0, error_volume.shape[0], domain_size_x):
+        for y_start in range(0, error_volume.shape[1], domain_size_y):
+            for z_start in range(0, error_volume.shape[2], domain_size_z):
+                error_in_domain = error_volume[x_start:x_start+domain_size_x,
+                y_start:y_start+domain_size_y,z_start:z_start+domain_size_z].sum() / e_total
                 n_particles_in_domain = int(n * error_in_domain)
                 
                 particles_real[:,current_spot:current_spot+n_particles_in_domain] = \
-                torch.rand([3,n_particles_in_domain]) * domain_size
+                torch.rand([3,n_particles_in_domain])
+
+                particles_real[0,current_spot:current_spot+n_particles_in_domain] *= \
+                domain_size_x
+                particles_real[1,current_spot:current_spot+n_particles_in_domain] *= \
+                domain_size_y
+                particles_real[2,current_spot:current_spot+n_particles_in_domain] *= \
+                domain_size_z
+
                 particles_real[0,current_spot:current_spot+n_particles_in_domain] += \
                 x_start
                 particles_real[1,current_spot:current_spot+n_particles_in_domain] += \
@@ -269,7 +341,10 @@ ts_per_sec, time_length, device, periodic=False):
                     particles_real[2,current_spot] += z_start
                     current_spot += 1
                 '''
-    particles_real[:,current_spot:] = torch.rand([3, particles_real.shape[1]-current_spot]) * error_volume.shape[0]
+    particles_real[:,current_spot:] = torch.rand([3, particles_real.shape[1]-current_spot])
+    particles_real[0,current_spot:] *= error_volume.shape[0]
+    particles_real[1,current_spot:] *= error_volume.shape[1]
+    particles_real[2,current_spot:] *= error_volume.shape[2]
         
     particles_real = particles_real.transpose(0,1)
     particles_rec = particles_real.clone()
@@ -291,7 +366,7 @@ ts_per_sec, time_length, device, periodic=False):
             particles_real += flow_real.permute(1,0) * (1 / ts_per_sec)
             particles_rec += flow_rec.permute(1,0) * (1 / ts_per_sec)
 
-            transport_loss += torch.norm(particles_real -particles_rec, dim=1).mean()
+            transport_loss += torch.norm(particles_real-particles_rec, dim=1).mean()
         else:
             indices = (particles_real[:,0] > 0.0) & (particles_real[:,1] > 0.0) & \
             (particles_real[:,2] > 0.0) & (particles_rec[:,0] > 0.0) & (particles_rec[:,1] > 0.0) & \
@@ -308,9 +383,55 @@ ts_per_sec, time_length, device, periodic=False):
             particles_real[indices] += flow_real.permute(1,0) * (1 / ts_per_sec)
             particles_rec[indices] += flow_rec.permute(1,0) * (1 / ts_per_sec)
             
-            transport_loss += torch.norm(particles_real[indices] -particles_rec[indices], dim=1).mean()
+            transport_loss += torch.norm(particles_real[indices]-particles_rec[indices], dim=1).mean()
     return transport_loss / (time_length * ts_per_sec)
     
+def sample_adaptive_streamline_seeds(error_volume, n, device):
+    e_total = error_volume.sum()
+    particles = torch.zeros([3, n], device=device)
+    current_spot = 0
+    octtreescale = 3
+    #for octtreescale in range(octtree_levels):
+    domain_size_x = int((1.0 / (2**octtreescale)) * error_volume.shape[0])
+    domain_size_y = int((1.0 / (2**octtreescale)) * error_volume.shape[1])
+    domain_size_z = int((1.0 / (2**octtreescale)) * error_volume.shape[2])
+    
+    for x_start in range(0, error_volume.shape[0], domain_size_x):
+        for y_start in range(0, error_volume.shape[1], domain_size_y):
+            for z_start in range(0, error_volume.shape[2], domain_size_z):
+                error_in_domain = error_volume[x_start:x_start+domain_size_x,
+                y_start:y_start+domain_size_y,z_start:z_start+domain_size_z].sum() / e_total
+                n_particles_in_domain = int(n * error_in_domain)
+                
+                
+                particles[:,current_spot:current_spot+n_particles_in_domain] = \
+                torch.rand([3,n_particles_in_domain])
+                
+                particles[0,current_spot:current_spot+n_particles_in_domain] *= domain_size_x
+                particles[1,current_spot:current_spot+n_particles_in_domain] *= domain_size_y
+                particles[2,current_spot:current_spot+n_particles_in_domain] *= domain_size_z
+
+                particles[0,current_spot:current_spot+n_particles_in_domain] += x_start
+                particles[1,current_spot:current_spot+n_particles_in_domain] += y_start
+                particles[2,current_spot:current_spot+n_particles_in_domain] += z_start
+                current_spot += n_particles_in_domain
+
+    particles[:,current_spot:] = torch.rand([3, particles.shape[1]-current_spot])
+    particles[0,current_spot:] *= error_volume.shape[0]
+    particles[1,current_spot:] *= error_volume.shape[1]
+    particles[2,current_spot:] *= error_volume.shape[2]
+
+    particles = particles.type(torch.LongTensor).transpose(0,1)
+    particles[0,:] = torch.clamp(particles[0,:], 0, error_volume.shape[0]-1)
+    particles[1,:] = torch.clamp(particles[1,:], 0, error_volume.shape[1]-1)
+    particles[2,:] = torch.clamp(particles[2,:], 0, error_volume.shape[2]-1)
+
+    particle_volume = torch.zeros(error_volume.shape).type(torch.FloatTensor).to(device)
+    for i in range(particles.shape[0]):
+        particle_volume[particles[i,0],particles[i,1],particles[i,2]] += 1
+    
+    return particle_volume
+
 def streamline_loss2D(real_VF, rec_VF, x_res, y_res, ts_per_sec, time_length, device, periodic=False):
     x = torch.arange(0, real_VF.shape[2], real_VF.shape[2] / x_res, 
     dtype=torch.float32).view(-1, 1).repeat([1, y_res])
