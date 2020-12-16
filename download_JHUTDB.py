@@ -151,9 +151,9 @@ frames = []
 name="mixing"
 t0 = time.time()
 count = 0
-endts = 500
+endts = 1015
 ts_skip = 25
-for i in range(1, endts, ts_skip):
+for i in range(500, endts, ts_skip):
     print("TS %i/%i" % (i, endts))
     f = get_full_frame_parallel(0, 1024, 8,#x
     0, 1024, 8, #y

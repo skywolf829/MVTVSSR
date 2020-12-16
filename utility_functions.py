@@ -422,9 +422,9 @@ def sample_adaptive_streamline_seeds(error_volume, n, device):
     particles[2,current_spot:] *= error_volume.shape[2]
 
     particles = particles.type(torch.LongTensor).transpose(0,1)
-    particles[0,:] = torch.clamp(particles[0,:], 0, error_volume.shape[0]-1)
-    particles[1,:] = torch.clamp(particles[1,:], 0, error_volume.shape[1]-1)
-    particles[2,:] = torch.clamp(particles[2,:], 0, error_volume.shape[2]-1)
+    particles[:,0] = torch.clamp(particles[:,0], 0, error_volume.shape[0]-1)
+    particles[:,1] = torch.clamp(particles[:,1], 0, error_volume.shape[1]-1)
+    particles[:,2] = torch.clamp(particles[:,2], 0, error_volume.shape[2]-1)
 
     particle_volume = torch.zeros(error_volume.shape).type(torch.FloatTensor).to(device)
     for i in range(particles.shape[0]):

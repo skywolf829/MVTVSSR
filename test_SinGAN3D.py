@@ -15,7 +15,9 @@ from skimage.transform.pyramids import pyramid_reduce
 from energy_spectra_analysis import *
 from scipy import stats
 
-def save_VF(vf, name, error_field=None, streamline_error_field=None, particle_seeds=None):
+def save_VF(vf, name, error_field=None, streamline_error_field=None, 
+particle_seeds=None, angle_error_field=None, magnitude_error_field=None,
+vorticity_field=None):
     from netCDF4 import Dataset
     rootgrp = Dataset(name+".nc", "w", format="NETCDF4")
     
@@ -40,6 +42,15 @@ def save_VF(vf, name, error_field=None, streamline_error_field=None, particle_se
     if(particle_seeds is not None):
         seeds = rootgrp.createVariable("seeds", np.float32, ("u","v","w"))
         seeds[:] = particle_seeds
+    if(angle_error_field is not None):
+        anglerr = rootgrp.createVariable("angle_err", np.float32, ("u","v","w"))
+        anglerr[:] = angle_error_field
+    if(magnitude_error_field is not None):
+        magerr = rootgrp.createVariable("mag_err", np.float32, ("u","v","w"))
+        magerr[:] = magnitude_error_field
+    if(vorticity_field is not None):
+        vortmag = rootgrp.createVariable("vorticity_magnitude", np.float32, ("u","v","w"))
+        vortmag[:] = vorticity_field
 
     m = np.linalg.norm(vf.cpu().numpy(),axis=0)
 
@@ -52,8 +63,8 @@ save_folder = os.path.join(MVTVSSR_folder_path, "SavedModels")
 
 parser = argparse.ArgumentParser(description='Test a trained model')
 
-parser.add_argument('--load_from',default="iso128_baseline")
-parser.add_argument('--data_folder',default="JHUturbulence/isotropic128_downsampled",
+parser.add_argument('--load_from',default="mixing_cnn")
+parser.add_argument('--data_folder',default="JHUturbulence/mixing",
 type=str,help='File to test on')
 parser.add_argument('--device',default="cuda:0",type=str,
 help='Frames to use from training file')
@@ -66,15 +77,22 @@ opt["device"] = args["device"]
 
 dataset = Dataset(os.path.join(input_folder, args["data_folder"]), opt)
 
+test_data_folder = "TestingData/mixing128/"
+
 
 models_to_try = [
 #"iso128_baseline", "iso128_streamline0.5", 
 #"iso128_streamline0.5_periodic", 
 #"iso128_streamline0.5_periodic2",
 #"iso128_streamline0.5_periodic_adaptive",
-"iso128_cnn_baseline",
-"iso128_cnn_streamlines0.5",
-"iso128_cnn_streamlines0.5_adaptive"]
+#"iso128_cnn_baseline",
+#"iso128_cnn_streamlines0.5",
+#"iso128_cnn_streamlines0.5_adaptive"
+"mixing_cnn",
+"mixing_cnn_0.75"
+#"mixing_cnn_streamline",
+#"mixing_cnn_streamline_adaptive"
+]
 
 streamline_errors = []
 PSNRs = []
@@ -101,8 +119,9 @@ for model_name in models_to_try:
     streams = []
     energy_spectrum = None
     num_ts = 0
-    for ts in range(0, 500, 25):
-        data = np.load(str(ts)+".npy")
+    for ts in range(0, 1001, 25):
+        print(ts)
+        data = np.load(test_data_folder + str(ts)+".npy")
         data = np2torch(data, "cuda:0").unsqueeze(0)
         data = dataset.scale(data)
 
@@ -146,17 +165,22 @@ for model_name in models_to_try:
 
         num_ts += 1
        
-        if(ts == 0):
+        if(ts == 475):
+            vort = curl3D(data, opt['device'])
+            vort_mag = torch.norm(vort, dim=1)[0]
             mpl.rcParams['agg.path.chunksize'] = 128*128*128*4
             save_VF(upscaled_data[0], model_name, 
             error_field=(mags+angles)[0].cpu().numpy(), streamline_error_field=s, 
-            particle_seeds=sample_adaptive_streamline_seeds((mags+angles)[0], 128*128*128, opt['device']).cpu().numpy())
-            plt.scatter((mags+angles)[0].cpu().numpy().flatten(), s.flatten())
-            plt.title("Error field vs streamline error field")
-            plt.xlabel("Error field")
+            particle_seeds=sample_adaptive_streamline_seeds((mags+angles)[0], 128*128*128, opt['device']).cpu().numpy(),
+            angle_error_field=angles[0].cpu().numpy(), magnitude_error_field=mags[0].cpu().numpy(), 
+            vorticity_field=vort_mag.cpu().numpy())
+
+            plt.scatter((angles[0]+mags[0]+vort_mag).cpu().numpy().flatten(), s.flatten())
+            plt.title("Angles+mags+vort mag error field vs streamline error field")
+            plt.xlabel("Angles+mags+vort mag error field")
             plt.ylabel("Streamline error field")
-            xs = np.array([(mags+angles).min(), (mags+angles).max()])
-            slope, intercept, r_value, p_value, std_err = stats.linregress((mags+angles)[0].cpu().numpy().flatten(), s.flatten())
+            xs = np.array([(angles+mags+vort_mag).min(), (angles+mags+vort_mag).max()])
+            slope, intercept, r_value, p_value, std_err = stats.linregress((angles[0]+mags[0]+vort_mag).cpu().numpy().flatten(), s.flatten())
             plt.plot(xs, intercept+slope*xs, 'r')
             plt.show()
             print("slope: %0.04f, intercept: %0.04f, r_value: %0.04f, p_value: %0.04f, std_err: %0.04f" % \
@@ -175,15 +199,19 @@ mses = []
 streams = []
 num_ts = 0
 energy_spectrum = None
-for ts in range(0, 500, 25):
-    data = np.load(str(ts)+".npy")
+for ts in range(0, 1001, 25):
+    data = np.load(test_data_folder + str(ts)+".npy")
     data = np2torch(data, "cuda:0").unsqueeze(0)
     data = dataset.scale(data)
 
+    '''
     data_lr = laplace_pyramid_downscale3D(data, opt['n']-1,
         opt['spatial_downscale_ratio'],
         "cuda:0")
-    
+    '''
+    data_lr = laplace_pyramid_downscale3D(data, 2,
+        0.5,
+        "cuda:0")
     upscaled_data = F.interpolate(data_lr, size=[128,128,128],
     mode='trilinear', align_corners=True)
 
@@ -212,7 +240,7 @@ for ts in range(0, 500, 25):
     mses.append(m)
     streams.append(s)
 
-    if(ts == 0):
+    if(ts == 475):
         save_VF(upscaled_data[0], "trilin")
         save_VF(dataset.unscale(data)[0], "gt")
 
@@ -249,7 +277,7 @@ plt.show()
 
 energy_spectrum = None
 for ts in range(0, 500, 25):
-    data = np.load(str(ts)+".npy")
+    data = np.load(test_data_folder + str(ts)+".npy")
     data = np2torch(data, "cuda:0").unsqueeze(0)
 
     if(energy_spectrum is None):
