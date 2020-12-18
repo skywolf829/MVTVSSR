@@ -42,15 +42,15 @@ class Options():
         opt["save_discriminators"]     = True
         opt["physical_constraints"]    = "none"
         opt["patch_size"]              = 128
-        opt["training_patch_size"]     = 96
+        opt["training_patch_size"]     = 128
         opt["regularization"]          = "GP" #Either TV (total variation) or GP (gradient penalty) or SN 
         # GAN training info
         opt["alpha_1"]                 = 0       # Reconstruction loss coefficient
-        opt["alpha_2"]                 = 1        # Adversarial loss coefficient
+        opt["alpha_2"]                 = 0        # Adversarial loss coefficient
         opt["alpha_3"]                 = 0        # Soft physical loss coefficient
-        opt["alpha_4"]                 = 100       # mag_and_angle loss
+        opt["alpha_4"]                 = 1        # mag_and_angle loss
         opt["alpha_5"]                 = 1          # first derivative loss coeff
-        opt["alpha_6"]                 = 0.5  # Lagrangian transport loss
+        opt["alpha_6"]                 = 0  # Lagrangian transport loss
         opt["adaptive_streamlines"]    = False
         opt['streamline_res']          = 20
         opt['streamline_length']       = 50
@@ -64,6 +64,7 @@ class Options():
         opt["beta_1"]                  = 0.5
         opt["beta_2"]                  = 0.999
         opt["gamma"]                   = 0.1
+        opt['zero_noise']              = True
 
         # Info during training (to continue if it stopped)
         opt["scale_in_training"]       = 0

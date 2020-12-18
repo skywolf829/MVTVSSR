@@ -62,6 +62,7 @@ if __name__ == '__main__':
     parser.add_argument('--patch_size',default=None, type=int,help='Patch size for inference')
     parser.add_argument('--training_patch_size',default=None, type=int,help='Patch size for training')
     parser.add_argument('--upsample_mode',default=None, type=str,help='Method for upsampling')
+    parser.add_argument('--zero_noise',default=None, type=str2bool,help='Whether or not to use zero noise during upscaling')
 
     parser.add_argument('--load_from',default=None, type=str,help='Load a model to continue training')
     parser.add_argument('--save_every',default=None, type=int,help='How often to save during training')

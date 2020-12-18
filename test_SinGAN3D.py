@@ -89,9 +89,10 @@ models_to_try = [
 #"iso128_cnn_streamlines0.5",
 #"iso128_cnn_streamlines0.5_adaptive"
 "mixing_cnn",
-"mixing_cnn_0.75"
+#"mixing_cnn_randnoise",
+"mixing_cnn_k64",
 #"mixing_cnn_streamline",
-#"mixing_cnn_streamline_adaptive"
+"mixing_cnn_streamline_adaptive"
 ]
 
 streamline_errors = []
@@ -174,7 +175,7 @@ for model_name in models_to_try:
             particle_seeds=sample_adaptive_streamline_seeds((mags+angles)[0], 128*128*128, opt['device']).cpu().numpy(),
             angle_error_field=angles[0].cpu().numpy(), magnitude_error_field=mags[0].cpu().numpy(), 
             vorticity_field=vort_mag.cpu().numpy())
-
+            '''
             plt.scatter((angles[0]+mags[0]+vort_mag).cpu().numpy().flatten(), s.flatten())
             plt.title("Angles+mags+vort mag error field vs streamline error field")
             plt.xlabel("Angles+mags+vort mag error field")
@@ -185,6 +186,7 @@ for model_name in models_to_try:
             plt.show()
             print("slope: %0.04f, intercept: %0.04f, r_value: %0.04f, p_value: %0.04f, std_err: %0.04f" % \
             (slope, intercept, r_value, p_value, std_err))
+            '''
 
 
     PSNRs.append(ps)
