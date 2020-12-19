@@ -80,38 +80,37 @@ test_data_folder = "TestingData/iso128/"
 start_ts = 0
 end_ts = 500
 ts_skip = 25
-ts_to_save = 0
+ts_to_save = 475
 
 models_to_try = [
-    #"0.5_2_zero",
+    "0.5_2_zero",
     #"0.5_2_noise",
-    #"0.5_4_zero",
+    "0.5_4_zero",
     #"0.5_4_noise",
-    #"0.5_8_zero",
+    "0.5_8_zero",
     #"0.5_8_noise",
-    #"0.5_16_zero",
+    "0.5_16_zero",
     #"0.5_16_noise",
-    #"0.5_32_zero",
+    "0.5_32_zero",
     #"0.5_32_noise",
     "0.5_64_zero",
     #"0.5_64_noise",
-    #"0.5_128_zero",
-    #"Temp"
+    "0.5_128_zero",
     #"0.5_128_noise",
-    #"0.75_2_zero",
-    #"0.75_2_noise",
-    #"0.75_4_zero",
-    #"0.75_4_noise",
-    #"0.75_8_zero",
-    #"0.75_8_noise",
-    #"0.75_16_zero",
-    #"0.75_16_noise",
-    #"0.75_32_zero",
-    #"0.75_32_noise",
-    #"0.75_64_zero",
-    #"0.75_64_noise",
-    #"0.75_128_zero",
-    #"0.75_128_noise"
+    #"0.758_2_zero",
+    #"0.758_2_noise",
+    #"0.758_4_zero",
+    #"0.758_4_noise",
+    #"0.758_8_zero",
+    #"0.758_8_noise",
+    #"0.758_16_zero",
+    #"0.758_16_noise",
+    #"0.758_32_zero",
+    #"0.758_32_noise",
+    #"0.758_64_zero",
+    #"0.758_64_noise",
+    #"0.758_128_zero",
+    #"0.758_128_noise"
 ]
 
 streamline_errors = []
