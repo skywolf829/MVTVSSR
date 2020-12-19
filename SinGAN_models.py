@@ -852,7 +852,7 @@ def train_single_scale(generators, discriminators, opt):
                     else:
                         fake_prev = torch.zeros(generator.get_input_shape()).to(opt["device"])
 
-                    if(opt['mode'] == "2D"):
+                    if(opt['mode'] == "2D" or opt['mode'] == '3Dto2D'):
                         fake_prev_view = fake_prev[:,:,starts[0]:ends[0],starts[1]:ends[1]]
                         noise = opt["noise_amplitudes"][-1] * torch.randn(fake_prev_view.shape,device=opt['device'])
                     elif(opt['mode'] == "3D"):
