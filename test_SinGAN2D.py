@@ -78,8 +78,8 @@ dataset = Dataset(os.path.join(input_folder, args["data_folder"]), opt)
 
 test_data_folder = "TestingData/iso128/"
 start_ts = 0
-end_ts = 500
-ts_skip = 25
+end_ts = 99
+ts_skip = 1
 ts_to_save = 475
 
 models_to_try = [
@@ -91,25 +91,25 @@ models_to_try = [
     #"0.5_8_noise",
     #"0.5_16_zero",
     #"0.5_16_noise",
-    "0.5_32_zero",
-    "0.5_32_noise",
+    #"0.5_32_zero",
+    #"0.5_32_noise",
     #"0.5_64_zero",
     #"0.5_64_noise",
     #"0.5_128_zero",
     #"0.5_128_noise",
-    #"0.758_2_zero",
+    "0.758_2_zero",
     #"0.758_2_noise",
-    #"0.758_4_zero",
+    "0.758_4_zero",
     #"0.758_4_noise",
-    #"0.758_8_zero",
+    "0.758_8_zero",
     #"0.758_8_noise",
-    #"0.758_16_zero",
+    "0.758_16_zero",
     #"0.758_16_noise",
-    #"0.758_32_zero",
+    "0.758_32_zero",
     #"0.758_32_noise",
-    #"0.758_64_zero",
+    "0.758_64_zero",
     #"0.758_64_noise",
-    #"0.758_128_zero",
+    "0.758_128_zero",
     #"0.758_128_noise"
 ]
 
@@ -205,7 +205,7 @@ for ts in range(start_ts, end_ts, ts_skip):
 PSNRs.append(ps)
 
 for i in range(len(PSNRs)):
-    plt.plot(np.arange(1, (num_ts)*25+1, 25), PSNRs[i])
+    plt.plot(np.arange(1, (num_ts)*ts_skip+1, ts_skip), PSNRs[i])
 plt.legend(labels)
 plt.title("Upscaled PSNR over timesteps")
 plt.xlabel("Timestep")
