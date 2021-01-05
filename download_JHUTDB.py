@@ -151,7 +151,7 @@ name = "isotropic1024coarse"
 #name="mixing"
 t0 = time.time()
 count = 0
-startts = 0
+startts = 1
 endts = 100
 ts_skip = 1
 for i in range(startts, endts, ts_skip):
