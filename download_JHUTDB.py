@@ -147,12 +147,12 @@ sim_name, timestep, field, num_components, num_workers):
 frames = []
 
 #name = "channel"
-#name = "isotropic1024coarse"
-name="mixing"
+name = "isotropic1024coarse"
+#name="mixing"
 t0 = time.time()
 count = 0
-endts = 1015
-ts_skip = 25
+endts = 100
+ts_skip = 1
 for i in range(500, endts, ts_skip):
     print("TS %i/%i" % (i, endts))
     f = get_full_frame_parallel(0, 1024, 8,#x
