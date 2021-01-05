@@ -151,9 +151,10 @@ name = "isotropic1024coarse"
 #name="mixing"
 t0 = time.time()
 count = 0
+startts = 0
 endts = 100
 ts_skip = 1
-for i in range(500, endts, ts_skip):
+for i in range(startts, endts, ts_skip):
     print("TS %i/%i" % (i, endts))
     f = get_full_frame_parallel(0, 1024, 8,#x
     0, 1024, 8, #y
@@ -172,7 +173,7 @@ for i in range(500, endts, ts_skip):
 #"cuda").permute(3, 0, 1, 2).unsqueeze(0), 2, 0.5,"cuda")[0].permute(1,2,3,0).cpu().numpy()
 
 #np.save("0.npy", f.astype(np.float32).swapaxes(0,3).swapaxes(3,2).swapaxes(2,1))
-print(f.shape)
+#print(f.shape)
 print("finished")
 print(time.time() - t0)
 #lJHTDB.finalize()
