@@ -89,19 +89,18 @@ for i in range(data_hr_image.shape[0]):
                                         bins = kbins)
     Abins *= 4. * np.pi / 3. * (kbins[1:]**3 - kbins[:-1]**3)
     plt.plot(kvals, Abins, color="green", label="high-res channel " + str(i))
-#x = generators[1].model[0](data_lr)
-#x = generators[1].model[0][0](data_lr)
+x = generators[1].model[0](data_lr + opt["noise_amplitudes"][1]*generators[1].optimal_noise)
+weights = generators[1].model[0][0].weight
+print(weights[0])
+#x = generators[1].model[0][0](data_lr + opt["noise_amplitudes"][1]*generators[1].optimal_noise)
 #x = generators[1].model[0][1](x)
-#x = generators[1].model[1](x)
-#x = generators[1].model[1][0](x)
-#x = generators[1].model[1][1](x)
 #x = generators[1].model[1](x)
 #x = generators[1].model[2](x)
 #x = generators[1].model[3](x)
 #x = generators[1].model[4](x)
 #x += data_lr
-#x = generators[1](data_lr)
-x = generators[1](data_lr, None)
+
+#x = generators[1](data_lr, opt["noise_amplitudes"][1]*generators[1].optimal_noise)
 #x = generate_by_patch(generators[0:2], 
 #        "reconstruct", opt, 
 #       opt['device'], opt['patch_size'], 
