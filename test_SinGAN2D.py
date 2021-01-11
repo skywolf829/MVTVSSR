@@ -80,37 +80,37 @@ test_data_folder = "TestingData/iso128/"
 start_ts = 0
 end_ts = 99
 ts_skip = 1
-ts_to_save = 475
+ts_to_save = 98
 
 models_to_try = [
-    #"0.5_2_zero",
-    #"0.5_2_noise",
-    #"0.5_4_zero",
-    #"0.5_4_noise",
-    #"0.5_8_zero",
-    #"0.5_8_noise",
-    #"0.5_16_zero",
-    #"0.5_16_noise",
-    #"0.5_32_zero",
-    #"0.5_32_noise",
-    #"0.5_64_zero",
-    #"0.5_64_noise",
-    #"0.5_128_zero",
-    #"0.5_128_noise",
-    #"0.758_2_zero",
-    "0.758_2_noise",
-    #"0.758_4_zero",
-    "0.758_4_noise",
-    #"0.758_8_zero",
-    "0.758_8_noise",
-    #"0.758_16_zero",
-    "0.758_16_noise",
-    #"0.758_32_zero",
-    "0.758_32_noise",
-    #"0.758_64_zero",
-    "0.758_64_noise",
-    #"0.758_128_zero",
-    "0.758_128_noise"
+    #"gan_0.5_2_zero",
+    "gan_0.5_2_noise",
+    #"gan_0.5_4_zero",
+    "gan_0.5_4_noise",
+    #"gan_0.5_8_zero",
+    "gan_0.5_8_noise",
+    #"gan_0.5_16_zero",
+    "gan_0.5_16_noise",
+    #"gan_0.5_32_zero",
+    "gan_0.5_32_noise",
+    #"gan_0.5_64_zero",
+    "gan_0.5_64_noise",
+    #"gan_0.5_128_zero",
+    "gan_0.5_128_noise",
+    #"gan_0.758_2_zero",
+    #"gan_0.758_2_noise",
+    #"gan_0.758_4_zero",
+    #"gan_0.758_4_noise",
+    #"gan_0.758_8_zero",
+    #"gan_0.758_8_noise",
+    #"gan_0.758_16_zero",
+    #"gan_0.758_16_noise",
+    #"gan_0.758_32_zero",
+    #"gan_0.758_32_noise",
+    #"gan_0.758_64_zero",
+    #"gan_0.758_64_noise",
+    #"gan_0.758_128_zero",
+    #"gan_0.758_128_noise"
 ]
 
 streamline_errors = []
